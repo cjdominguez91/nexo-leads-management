@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/* Dark mode manual (clase .dark en <html>), no solo prefers-color-scheme —
+   así el usuario puede elegir tema con un switch (ver stores/theme.ts). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* "brand" = morado/índigo principal (botones, links, acentos de marca). */
+  --color-brand-50: #f1f1fb;
+  --color-brand-100: #e2e3f6;
+  --color-brand-200: #c5c7ee;
+  --color-brand-300: #a8abe5;
+  --color-brand-400: #8b8fdc;
+  --color-brand-500: #6a6fd1;
+  --color-brand-600: #5459b9;
+  --color-brand-700: #43468f;
+  --color-brand-800: #33356b;
+  --color-brand-900: #232447;
+  --color-brand-950: #16172e;
+
+  /* "accent" = verde azulado (logo, íconos secundarios, éxito). */
+  --color-accent-50: #e6faf7;
+  --color-accent-100: #ccf5ef;
+  --color-accent-200: #99ebdf;
+  --color-accent-300: #66e0cf;
+  --color-accent-400: #33d6bf;
+  --color-accent-500: #0ab39c;
+  --color-accent-600: #08a08c;
+  --color-accent-700: #067d6d;
+  --color-accent-800: #045a4e;
+  --color-accent-900: #02362f;
+
+  /* Superficies del layout — mismo nombre de token en claro/oscuro, el
+     valor cambia bajo .dark más abajo. "sidebar" no cambia entre modos
+     (mismo #333547 en ambos), así que solo se define acá. */
+  --color-surface-navbar: #ececf1;
+  --color-surface-sidebar: #333547;
+  --color-surface-bg: #f8f9fa;
+  --color-surface-card: #ffffff;
+}
+
+.dark {
+  --color-surface-navbar: #36394c;
+  --color-surface-bg: #222736;
+  --color-surface-card: #2a3042;
+}
+
+:root {
+  /* Ligado a la clase .dark (no prefers-color-scheme): si no, el navegador
+     pinta inputs/selects con sus colores nativos según el tema del SO,
+     independientemente de si la app está en claro u oscuro — eso es lo que
+     causaba texto blanco invisible sobre fondo blanco en modo claro. */
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
+}
+
+.dark body {
+  color: #f1f5f9;
+}
+
+/* Refuerzo explícito además del fix de color-scheme: algunos navegadores
+   no heredan `color` en controles de formulario desde el body. */
+input,
+select,
+textarea {
+  color: #0f172a;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  color: #f1f5f9;
+}
+
+/* Contenedor "card" estándar — fondo blanco/#2A3042 sobre el fondo gris de
+   la página, para que las secciones tengan contraste real (ver style.css
+   surface tokens arriba). Se usa en vez de repetir la misma cadena de
+   utilidades en cada vista. */
+@layer components {
+  .card {
+    border-radius: var(--radius-lg);
+    border-width: 1px;
+    border-color: var(--color-slate-200);
+    background-color: var(--color-surface-card);
+  }
+
+  .dark .card {
+    border-color: var(--color-slate-800);
+  }
+}

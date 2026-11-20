@@ -1,0 +1,14 @@
+# Fuerza LF en el repo: el código corre en contenedores Linux (Docker), donde
+# CRLF rompe Dockerfiles, scripts de shell y entrypoints.
+* text=auto eol=lf
+
+# Binarios: no tocar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.xlsx binary
+*.pdf binary

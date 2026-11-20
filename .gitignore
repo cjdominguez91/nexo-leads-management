@@ -1,0 +1,23 @@
+# Entorno
+.env
+.env.local
+
+# Backend / Python
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/staticfiles/
+backend/media/
+
+# Frontend / Node
+frontend/node_modules/
+frontend/dist/
+
+# Editores / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+
+# Claude Code (config personal; settings.json del proyecto sí se versiona)
+.claude/settings.local.json
