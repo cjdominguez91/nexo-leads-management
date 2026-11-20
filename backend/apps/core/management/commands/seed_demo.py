@@ -413,7 +413,7 @@ class Command(BaseCommand):
                         "plazo": self.rng.choice(["12", "24", "36", "48"]),
                         "vence_oferta": (date.today() + timedelta(days=60)).isoformat(),
                     }
-                    filas.append({**atributos, "agencia": agencia.codigo})
+                    filas.append({**atributos, "agencia_codigo": agencia.codigo})
                     datos.append((agencia, atributos, monto))
 
             lote = self._lote(
@@ -497,7 +497,7 @@ class Command(BaseCommand):
                 "monto": monto,
                 "plazo": self.rng.choice(["12", "24", "36", "60"]),
             }
-            filas.append({**atributos, "agencia": self.a_merliot.codigo})
+            filas.append({**atributos, "agencia_codigo": self.a_merliot.codigo})
             datos.append(atributos)
 
         lote = self._lote(self.camp_pyme, self.admin_be, "credito_pyme_demo.csv", filas, "Crédito PYME")

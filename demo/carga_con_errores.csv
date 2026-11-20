@@ -1,0 +1,11 @@
+﻿nombre,dni,telefono,correo,segmento,monto,tasa,plazo,vence_oferta,agencia_codigo
+Carlos Ríos Rojas,86548467,900 295 615,carlos.8467@correo-demo.com,Joven,12000,19.9,24,2027-01-31,1
+Carlos Castillo Flores,85265042,900 453 786,carlos.5042@correo-demo.com,Preferente,12000,19.9,48,2027-01-31,2
+Lucía Herrera Castillo,85906233,900 812 196,lucía.6233@correo-demo.com,Masivo,20000,19.9,12,2027-01-31,3
+Lucía Flores Ramírez,85681873,900 402 696,lucía.1873@correo-demo.com,Masivo,15000,19.9,48,2027-01-31,1
+Paula Torres Ríos,87711969,900 550 924,paula.1969@correo-demo.com,Joven,12000,17.5,48,2027-01-31,2
+Paula Flores Rojas,,900 497 988,paula.0511@correo-demo.com,Joven,15000,19.9,36,2027-01-31,1
+Diego Mendoza Mendoza,81405814,900 549 623,diego.5814@correo-demo.com,Masivo,20000,14.9,12,2027-01-31,4
+Carlos Vargas Ríos,87514353,900 372 712,carlos.4353@correo-demo.com,Preferente,doce mil,17.5,24,2027-01-31,2
+Miguel Vega Flores,83066232,900 269 149,miguel.6232@correo-demo.com,Masivo,20000,17.5,18,2027-01-31,3
+Carlos Ríos Rojas,86548467,900 000 111,carlos.8467@correo-demo.com,Joven,12000,19.9,24,2027-01-31,1

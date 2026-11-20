@@ -1,0 +1,16 @@
+﻿nombre,dni,telefono,correo,segmento,monto,tasa,plazo,vence_oferta,agencia_codigo
+Carlos Castillo Castillo,85240080,900 297 942,carlos.0080@correo-demo.com,Preferente,12000,17.5,24,2027-01-31,1
+Valeria Ríos Ríos,83440606,900 612 102,valeria.0606@correo-demo.com,Masivo,5000,17.5,24,2027-01-31,2
+Valeria Rojas Flores,84208319,900 439 429,valeria.8319@correo-demo.com,Preferente,5000,19.9,36,2027-01-31,3
+Miguel Castillo Castillo,89958500,900 296 173,miguel.8500@correo-demo.com,Preferente,8000,19.9,48,2027-01-31,1
+Luis Vega Vega,82280081,900 317 860,luis.0081@correo-demo.com,Masivo,5000,14.9,48,2027-01-31,2
+Paula Salazar Torres,82330955,900 378 555,paula.0955@correo-demo.com,Joven,20000,14.9,36,2027-01-31,3
+Ana Rojas Navarro,89887272,900 720 643,ana.7272@correo-demo.com,Preferente,8000,19.9,48,2027-01-31,1
+José Flores Rojas,87755244,900 113 135,josé.5244@correo-demo.com,Preferente,15000,19.9,12,2027-01-31,2
+Daniela Rojas Torres,87007110,900 362 616,daniela.7110@correo-demo.com,Joven,15000,14.9,48,2027-01-31,3
+María Mendoza Salazar,82597049,900 194 117,maría.7049@correo-demo.com,Masivo,12000,17.5,12,2027-01-31,1
+Daniela Herrera Flores,82043513,900 878 948,daniela.3513@correo-demo.com,Preferente,5000,14.9,12,2027-01-31,2
+Luis Rojas Herrera,88822626,900 205 975,luis.2626@correo-demo.com,Preferente,8000,17.5,24,2027-01-31,3
+María Flores Flores,82442154,900 125 151,maría.2154@correo-demo.com,Preferente,20000,17.5,48,2027-01-31,1
+Valeria Mendoza Navarro,89212789,900 959 205,valeria.2789@correo-demo.com,Masivo,20000,17.5,36,2027-01-31,2
+Lucía Herrera Castillo,85634822,900 118 706,lucía.4822@correo-demo.com,Masivo,5000,14.9,12,2027-01-31,3

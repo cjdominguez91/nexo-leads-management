@@ -98,6 +98,25 @@ Banca Empresas
 5. **Trazabilidad:** en el detalle de un lead, revisa la línea de tiempo de gestiones y la cadena de custodia. Hay un lead que el supervisor movió de Agencia Centro a Diagonal Universitaria.
 6. **Tableros:** como `gerente`, revisa efectividad por campaña y la tendencia.
 
+## Archivos para mostrar la carga masiva
+
+En la carpeta [`demo/`](demo/) hay archivos listos para subir en vivo. Usan documentos distintos a los del script, así que no chocan con los datos ya cargados.
+
+| Archivo | Campaña donde subirlo | Entra como | Resultado |
+|---|---|---|---|
+| `carga_creditos_personales.csv` | Créditos Personales — Campaña de fin de año | `admin.persona@demo.nexo` | 15 registros nuevos en las agencias 1, 2 y 3 |
+| `carga_credito_pyme.csv` | Crédito PYME — Cierre de año | `admin.empresas@demo.nexo` | 10 empresas nuevas en Merliot |
+| `carga_con_errores.csv` | Créditos Personales — Campaña de fin de año | `admin.persona@demo.nexo` | Entran 5 y se rechazan 5, cada una con su motivo |
+
+Las 5 filas rechazadas de `carga_con_errores.csv` muestran la validación del servidor:
+- una fila sin DNI;
+- una agencia de otra división (Merliot), que no se deja meter en Banca Persona;
+- un monto con texto ("doce mil");
+- un plazo que no está en la lista (18 meses);
+- un documento repetido.
+
+El documento repetido está dentro del mismo archivo, así que el orden en que subas los archivos no importa.
+
 ## Si algo falla
 
 | Síntoma | Solución |
