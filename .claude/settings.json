@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(node check_dashboard3.js)"
-    ]
-  }
-}

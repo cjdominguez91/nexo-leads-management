@@ -20,5 +20,5 @@ frontend/dist/
 .DS_Store
 
 # Claude Code (config personal; settings.json del proyecto sí se versiona)
-.claude/settings.local.json
+.claude/
 backend/celerybeat-schedule*
