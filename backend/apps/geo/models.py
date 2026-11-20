@@ -4,9 +4,14 @@ from apps.core.models import CatalogModel
 
 
 class Territorio(CatalogModel):
-    """Distrito. Agrupa agencias; es el alcance territorial de SUPERVISOR."""
+    """Distrito. Agrupa agencias; es el alcance territorial de SUPERVISOR.
+
+    Pertenece a una División. La Agencia NO tiene FK propia a División: la
+    hereda de su distrito (agencia.territorio.division), así es imposible que
+    una agencia y su distrito queden en divisiones distintas."""
 
     codigo = models.CharField(max_length=20, unique=True)
+    division = models.ForeignKey("accounts.Division", on_delete=models.PROTECT, related_name="territorios")
 
     class Meta(CatalogModel.Meta):
         verbose_name = "Territorio"

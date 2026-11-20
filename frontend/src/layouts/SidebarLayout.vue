@@ -10,6 +10,7 @@ import {
   Megaphone,
   Menu,
   Moon,
+  ShieldCheck,
   Sun,
   Tags,
   UserSearch,
@@ -59,21 +60,37 @@ const navSections: NavSection[] = [
   {
     label: 'Administración',
     items: [
-      { label: 'Usuarios', to: '/admin/usuarios', icon: Users, roles: ['ADMIN'] },
-      { label: 'Agencias', to: '/admin/agencias', icon: Building2, roles: ['ADMIN'] },
+      { label: 'Usuarios', to: '/admin/usuarios', icon: Users, roles: ['ADMIN', 'ADMIN_DIVISION'] },
+      { label: 'Agencias', to: '/admin/agencias', icon: Building2, roles: ['ADMIN', 'ADMIN_DIVISION'] },
       { label: 'Divisiones', to: '/admin/divisiones', icon: Layers, roles: ['ADMIN'] },
-      { label: 'Tipos de campaña', to: '/admin/tipos-campana', icon: ClipboardList, roles: ['ADMIN'] },
-      { label: 'Catálogos', to: '/admin/catalogos', icon: Tags, roles: ['ADMIN'] },
+      { label: 'Tipos de campaña', to: '/admin/tipos-campana', icon: ClipboardList, roles: ['ADMIN', 'ADMIN_DIVISION'] },
+      { label: 'Catálogos', to: '/admin/catalogos', icon: Tags, roles: ['ADMIN', 'ADMIN_DIVISION'] },
     ],
   },
 ]
+
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: 'Administrador',
+  ADMIN_DIVISION: 'Admin de división',
+  GERENTE: 'Gerente',
+  SUPERVISOR: 'Supervisor',
+  JEFE: 'Jefe de agencia',
+  SUBJEFE: 'Subjefe de agencia',
+  EJECUTIVO: 'Ejecutivo',
+}
+const roleLabel = computed(() =>
+  authStore.user?.is_superuser && !authStore.roleName ? 'Superusuario' : ROLE_LABEL[authStore.roleName ?? ''] ?? '',
+)
+
+// La etiqueta de división no aplica a quien cruza divisiones (ADMIN global/superusuario).
+const divisionLabel = computed(() => (authStore.isGlobalAdmin ? null : authStore.user?.division_nombre ?? null))
 
 const visibleSections = computed(() =>
   navSections
     .map((section) => ({
       ...section,
       items: section.items.filter(
-        (item) => !item.roles || (authStore.roleName && item.roles.includes(authStore.roleName)),
+        (item) => !item.roles || authStore.user?.is_superuser || (authStore.roleName && item.roles.includes(authStore.roleName)),
       ),
     }))
     .filter((section) => section.items.length > 0),
@@ -164,6 +181,25 @@ onUnmounted(() => {
         <Menu :size="18" />
       </button>
 
+      <div v-if="divisionLabel" class="px-3 pb-1">
+        <div
+          v-if="!collapsed"
+          class="flex items-center gap-2 rounded-md border border-accent-500/30 bg-accent-500/10 px-2.5 py-1.5"
+          :title="`División: ${divisionLabel}`"
+        >
+          <Layers :size="14" class="shrink-0 text-accent-400" />
+          <div class="min-w-0">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-accent-300/80">División</p>
+            <p class="truncate text-xs font-medium text-accent-100">{{ divisionLabel }}</p>
+          </div>
+        </div>
+        <div v-else class="flex justify-center" :title="`División: ${divisionLabel}`">
+          <span class="flex h-8 w-8 items-center justify-center rounded-md bg-accent-500/15 text-xs font-bold text-accent-300">
+            {{ divisionLabel.slice(0, 2).toUpperCase() }}
+          </span>
+        </div>
+      </div>
+
       <nav class="flex-1 space-y-5 overflow-y-auto px-2 py-3">
         <div v-for="section in visibleSections" :key="section.label">
           <p v-if="!collapsed" class="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -188,8 +224,9 @@ onUnmounted(() => {
 
     <div class="flex flex-1 flex-col overflow-hidden">
       <header class="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-surface-navbar px-4 dark:border-slate-800">
-        <span class="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:bg-brand-950 dark:text-brand-300">
-          {{ authStore.roleName }}
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+          <ShieldCheck :size="13" />
+          {{ roleLabel }}
         </span>
         <div class="flex items-center gap-2">
           <button

@@ -1,9 +1,42 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from apps.core.scoping import es_global
 from apps.geo.models import Agencia, Territorio
 
+from .constants import ROLES_GESTIONABLES_POR_ADMIN_DIVISION, RoleNames
 from .models import Division, Role, User, UserAgencia, UserTerritorio
+
+
+def validar_alta_o_edicion_usuario(serializer, attrs):
+    """Reglas comunes a crear y editar usuarios.
+
+    Para un ADMIN_DIVISION (no global):
+    - La división del usuario es siempre la suya (lo que mande se ignora).
+    - Solo puede asignar roles de ROLES_GESTIONABLES_POR_ADMIN_DIVISION:
+      nunca ADMIN ni ADMIN_DIVISION (evita auto-escalarse o crear pares).
+    Para todos:
+    - Todo rol que no sea ADMIN necesita división (sin división no ve nada).
+    - La agencia principal debe ser de la división del usuario."""
+
+    request = serializer.context["request"]
+    actor = request.user
+    instance = serializer.instance
+
+    role = attrs.get("role", getattr(instance, "role", None))
+    if not es_global(actor):
+        attrs["division"] = actor.division
+        if role is not None and role.nombre not in ROLES_GESTIONABLES_POR_ADMIN_DIVISION:
+            raise serializers.ValidationError({"role": "No puedes asignar ese rol."})
+
+    division = attrs.get("division", getattr(instance, "division", None))
+    if role is not None and role.nombre != RoleNames.ADMIN and division is None:
+        raise serializers.ValidationError({"division": "Obligatoria para este rol."})
+
+    agencia = attrs.get("agencia_principal", getattr(instance, "agencia_principal", None))
+    if agencia is not None and (division is None or agencia.territorio.division_id != division.id):
+        raise serializers.ValidationError({"agencia_principal": "La agencia no pertenece a la división del usuario."})
+    return attrs
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -67,12 +100,16 @@ class UserSerializer(serializers.ModelSerializer):
             "auth_provider",
             "avatar_url",
             "is_active",
+            "is_superuser",
             "date_joined",
             "last_login",
             "agencias",
             "territorios",
         ]
-        read_only_fields = ["date_joined", "last_login", "auth_provider"]
+        read_only_fields = ["date_joined", "last_login", "auth_provider", "is_superuser"]
+
+    def validate(self, attrs):
+        return validar_alta_o_edicion_usuario(self, super().validate(attrs))
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -101,6 +138,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
         if value:
             validate_password(value)
         return value
+
+    def validate(self, attrs):
+        return validar_alta_o_edicion_usuario(self, super().validate(attrs))
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)

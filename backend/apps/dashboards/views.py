@@ -167,27 +167,36 @@ class ResumenView(APIView):
 
 class TendenciaView(APIView):
     """Serie de tiempo: gestiones registradas y oportunidades ganadas por
-    día, dentro de los últimos `dias` (default 30) y del mismo alcance/
-    filtros que el resto del dashboard."""
+    día, con el mismo alcance/filtros que el resto del dashboard.
+
+    Es la única vista del dashboard con recorte temporal propio: los KPIs
+    miden la campaña completa, pero aquí sí interesa ver el ritmo en el
+    tiempo. `dias` ausente o 0 = todo el histórico; `dias=N` = últimos N."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        dias = int(request.query_params.get("dias", 30))
-        desde = timezone.now() - timedelta(days=dias)
+        try:
+            dias = max(int(request.query_params.get("dias", 0)), 0)
+        except ValueError:
+            return Response({"detail": "dias debe ser un entero >= 0"}, status=400)
 
         lead_ids = _leads_filtrados(request).values_list("id", flat=True)
+        gestiones_qs = ManagementLog.objects.filter(lead_id__in=lead_ids)
+        ganadas_qs = Opportunity.objects.filter(lead_id__in=lead_ids, estado=OpportunityEstado.GANADA)
+        if dias:
+            desde = timezone.now() - timedelta(days=dias)
+            gestiones_qs = gestiones_qs.filter(timestamp__gte=desde)
+            ganadas_qs = ganadas_qs.filter(fecha_cierre__gte=desde)
 
         gestiones = (
-            ManagementLog.objects.filter(lead_id__in=lead_ids, timestamp__gte=desde)
-            .annotate(fecha=TruncDate("timestamp"))
+            gestiones_qs.annotate(fecha=TruncDate("timestamp"))
             .values("fecha")
             .annotate(cantidad=Count("id"))
             .order_by("fecha")
         )
         ganadas = (
-            Opportunity.objects.filter(lead_id__in=lead_ids, estado=OpportunityEstado.GANADA, fecha_cierre__gte=desde)
-            .annotate(fecha=TruncDate("fecha_cierre"))
+            ganadas_qs.annotate(fecha=TruncDate("fecha_cierre"))
             .values("fecha")
             .annotate(cantidad=Count("id"))
             .order_by("fecha")

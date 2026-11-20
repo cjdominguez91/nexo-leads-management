@@ -83,9 +83,12 @@ async function loadAll() {
     evolucion.value = evolucionRes
     capturas.value = capturasRes
     opportunity.value = oportunidadRes
-    asignables.value = asignablesRes.results
-    categories.value = categoriesRes.results.filter((c) => c.activo)
-    subcategories.value = subcategoriesRes.results
+    // Catálogo y destinatarios de la división de la campaña: para roles de
+    // división ya vienen filtrados, pero un ADMIN global recibe todos.
+    const divisionCampana = campaign.value.division
+    asignables.value = asignablesRes.results.filter((u) => u.division === divisionCampana || u.division === null)
+    categories.value = categoriesRes.results.filter((c) => c.activo && c.division === divisionCampana)
+    subcategories.value = subcategoriesRes.results.filter((s) => s.division === divisionCampana)
     capturaForm.value = { ...lead.value.atributos_captura }
   } catch (err: any) {
     loadError.value = err?.response?.data?.detail ?? 'No se pudo cargar el lead.'
@@ -185,12 +188,12 @@ onUnmounted(() => {
     <div class="flex items-center justify-between">
       <div>
         <button class="mb-1 text-xs text-slate-400 hover:underline" @click="router.back()">← Volver</button>
-        <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ lead.cliente_nombre || lead.documento_identidad }}</h1>
+        <h1 class="text-xl font-semibold text-slate-700 dark:text-slate-200">{{ lead.cliente_nombre || lead.documento_identidad }}</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400">{{ lead.campaign_nombre }}</p>
       </div>
       <div v-if="canAssign" class="flex items-center gap-2">
         <button
-          class="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white dark:bg-slate-100 dark:text-slate-900"
+          class="flex items-center gap-1.5 rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-1.5 text-sm text-white"
           @click="handleReassign"
         >
           <UserSearch :size="16" /> Reasignar
@@ -263,7 +266,7 @@ onUnmounted(() => {
             <button
               type="submit"
               :disabled="gestionSubmitting"
-              class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+              class="rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {{ gestionSubmitting ? 'Guardando…' : 'Guardar gestión' }}
             </button>

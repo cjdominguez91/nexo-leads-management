@@ -21,3 +21,4 @@ frontend/dist/
 
 # Claude Code (config personal; settings.json del proyecto sí se versiona)
 .claude/settings.local.json
+backend/celerybeat-schedule*

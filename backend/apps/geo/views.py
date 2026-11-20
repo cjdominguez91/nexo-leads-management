@@ -1,34 +1,30 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
 
-from apps.core.permissions import IsAdmin
+from apps.core.mixins import DivisionScopedViewSetMixin
 
 from .models import Agencia, Territorio
 from .serializers import AgenciaSerializer, TerritorioSerializer
 
 
-class _CatalogViewSet(viewsets.ModelViewSet):
-    """Lectura: cualquier usuario autenticado — cualquier pantalla que
-    necesite elegir/mostrar una agencia o distrito (restricción de campaña,
-    restricción de lote, filtros) necesita poder leer este catálogo, no
-    solo ADMIN. Escritura (alta/baja/edición): solo ADMIN."""
+class TerritorioViewSet(DivisionScopedViewSetMixin, viewsets.ModelViewSet):
+    """Lectura: cualquier autenticado, solo distritos de su división (lo
+    necesitan filtros, restricciones de campaña/lote, etc.). Escritura:
+    ADMIN (cualquier división) o ADMIN_DIVISION (la suya)."""
 
-    def get_permissions(self):
-        if self.action in ("create", "update", "partial_update", "destroy"):
-            return [IsAdmin()]
-        return [IsAuthenticated()]
-
-
-class TerritorioViewSet(_CatalogViewSet):
-    queryset = Territorio.objects.all()
+    queryset = Territorio.objects.select_related("division").all()
     serializer_class = TerritorioSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["activo"]
+    filterset_fields = ["activo", "division"]
+    division_lookup = "division"
 
 
-class AgenciaViewSet(_CatalogViewSet):
-    queryset = Agencia.objects.select_related("territorio").all()
+class AgenciaViewSet(DivisionScopedViewSetMixin, viewsets.ModelViewSet):
+    """Igual que TerritorioViewSet. La división de una agencia es la de su
+    distrito (no tiene FK propia)."""
+
+    queryset = Agencia.objects.select_related("territorio__division").all()
     serializer_class = AgenciaSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["activo", "territorio"]
+    filterset_fields = {"activo": ["exact"], "territorio": ["exact"], "territorio__division": ["exact"]}
+    division_lookup = "territorio__division"

@@ -6,10 +6,11 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.constants import GLOBAL_SCOPE_ROLES, RoleNames
+from apps.accounts.constants import DIVISION_SCOPE_ROLES, RoleNames
 from apps.campaigns.validators import AtributosValidationError
-from apps.core.permissions import IsAdmin, IsSupervisionRole
-from apps.core.scoping import agencias_visibles_para, campanas_visibles_para, usuarios_visibles_para
+from apps.core.mixins import DivisionScopedViewSetMixin
+from apps.core.permissions import IsSupervisionRole
+from apps.core.scoping import campanas_visibles_para, es_global, usuarios_visibles_para
 
 from .filters import LeadFilter
 from .models import Assignment, Category, Lead, SubCategory
@@ -43,31 +44,26 @@ def _role(user):
     return getattr(user.role, "nombre", None) if getattr(user, "role_id", None) else None
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
-    """Lectura: cualquier usuario autenticado — quien tipifica un lead
-    necesita leer este catálogo. Escritura: solo ADMIN."""
+class CategoryViewSet(DivisionScopedViewSetMixin, viewsets.ModelViewSet):
+    """Lectura: cualquier autenticado, solo categorías de su división —
+    quien tipifica un lead necesita leer este catálogo. Escritura: ADMIN o
+    ADMIN_DIVISION (la suya)."""
 
-    queryset = Category.objects.prefetch_related("subcategorias")
+    queryset = Category.objects.select_related("division").prefetch_related("subcategorias")
     serializer_class = CategorySerializer
-
-    def get_permissions(self):
-        if self.action in ("create", "update", "partial_update", "destroy"):
-            return [IsAdmin()]
-        return [IsAuthenticated()]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["division", "activo"]
+    division_lookup = "division"
 
 
-class SubCategoryViewSet(viewsets.ModelViewSet):
-    """Mismo criterio que CategoryViewSet: lectura abierta, escritura ADMIN."""
+class SubCategoryViewSet(DivisionScopedViewSetMixin, viewsets.ModelViewSet):
+    """Mismo criterio que CategoryViewSet; la división es la de su categoría."""
 
     queryset = SubCategory.objects.select_related("category")
     serializer_class = SubCategorySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["category", "activo"]
-
-    def get_permissions(self):
-        if self.action in ("create", "update", "partial_update", "destroy"):
-            return [IsAdmin()]
-        return [IsAuthenticated()]
+    division_lookup = "category__division"
 
 
 class UsuariosAsignablesViewSet(viewsets.ReadOnlyModelViewSet):
@@ -134,8 +130,10 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.ReadOnlyModelViewSet):
         if (
             self.action in self.DETAIL_ACTIONS
             and obj.campaign.esta_cerrada
-            and not user.is_superuser
-            and _role(user) not in GLOBAL_SCOPE_ROLES
+            # ADMIN/ADMIN_DIVISION/GERENTE conservan el detalle de campañas
+            # cerradas (para auditar); el queryset ya los limita a su división.
+            and not es_global(user)
+            and _role(user) not in DIVISION_SCOPE_ROLES
         ):
             raise PermissionDenied(
                 "Esta campaña está cerrada — el detalle de este registro ya no está disponible para tu rol."
@@ -276,24 +274,25 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not (user.is_superuser or role in GLOBAL_SCOPE_ROLES):
-            if role == RoleNames.EJECUTIVO:
-                if lead.usuario_asignado_id != user.id:
-                    return Response(
-                        {
-                            "detail": "Este registro ya no te pertenece, fue reasignado.",
-                            "usuario_asignado_email": (
-                                lead.usuario_asignado.email if lead.usuario_asignado else None
-                            ),
-                        },
-                        status=status.HTTP_409_CONFLICT,
-                    )
-            elif lead.agencia_id not in agencias_visibles_para(user).values_list("id", flat=True):
+        if not es_global(user):
+            if role == RoleNames.EJECUTIVO and lead.usuario_asignado_id != user.id:
+                return Response(
+                    {
+                        "detail": "Este registro ya no te pertenece, fue reasignado.",
+                        "usuario_asignado_email": (
+                            lead.usuario_asignado.email if lead.usuario_asignado else None
+                        ),
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            # Mismo criterio que la lectura (división + territorio), evaluado
+            # al momento de escribir, no cuando se abrió la pantalla.
+            if not leads_visibles_para(user).filter(pk=lead.pk).exists():
                 return Response(
                     {"detail": "Este lead está fuera de tu alcance."}, status=status.HTTP_403_FORBIDDEN
                 )
 
-        serializer = GestionarLeadInputSerializer(data=request.data)
+        serializer = GestionarLeadInputSerializer(data=request.data, context={"lead": lead})
         serializer.is_valid(raise_exception=True)
 
         try:

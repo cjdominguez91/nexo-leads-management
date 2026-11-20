@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ClipboardList, Layers, Plus } from '@lucide/vue'
+import { computed, onMounted, ref } from 'vue'
 
+import * as accountsApi from '@/api/accounts'
+import type { Division } from '@/api/accounts'
 import * as campaignsApi from '@/api/campaigns'
 import type {
   CampaignFieldDataType,
@@ -9,9 +12,17 @@ import type {
   CampaignModoCarga,
   CampaignType,
 } from '@/api/campaigns'
+import ActionButton from '@/components/ActionButton.vue'
 import { useConfirm } from '@/composables/useConfirm'
+import { useAuthStore } from '@/stores/auth'
 
 const confirm = useConfirm()
+const authStore = useAuthStore()
+// Los tipos son por división: ADMIN global elige en cuál crear; ADMIN_DIVISION
+// crea siempre en la suya (el backend la fija).
+const esAdminGlobal = computed(() => authStore.isGlobalAdmin)
+const divisiones = ref<Division[]>([])
+const filtroDivision = ref<number | null>(null)
 
 const DATA_TYPES: CampaignFieldDataType[] = ['TEXTO', 'NUMERO', 'FECHA', 'BOOLEANO', 'SELECT', 'MULTISELECT']
 const ORIGENES: { value: CampaignFieldOrigen; label: string }[] = [
@@ -28,10 +39,18 @@ function origenesPara(type: CampaignType) {
 }
 
 const types = ref<CampaignType[]>([])
+const tiposVisibles = computed(() =>
+  filtroDivision.value ? types.value.filter((t) => t.division === filtroDivision.value) : types.value,
+)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-const typeForm = ref({ nombre: '', categoria: 'VENTAS' as 'VENTAS' | 'COBROS', modo_carga: 'MASIVA' as CampaignModoCarga })
+const typeForm = ref({
+  nombre: '',
+  categoria: 'VENTAS' as 'VENTAS' | 'COBROS',
+  modo_carga: 'MASIVA' as CampaignModoCarga,
+  division: null as number | null,
+})
 
 const fieldForms = ref<Record<number, any>>({})
 const sectionForms = ref<Record<number, string>>({})
@@ -78,6 +97,9 @@ async function loadTypes() {
   try {
     const res = await campaignsApi.fetchCampaignTypes()
     types.value = res.results
+    if (esAdminGlobal.value && divisiones.value.length === 0) {
+      divisiones.value = (await accountsApi.fetchDivisions()).results
+    }
     for (const t of types.value) {
       if (!fieldForms.value[t.id]) fieldForms.value[t.id] = emptyFieldForm(datosClienteId(t))
       if (sectionForms.value[t.id] === undefined) sectionForms.value[t.id] = ''
@@ -90,8 +112,11 @@ async function loadTypes() {
 async function handleCreateType() {
   error.value = null
   try {
-    await campaignsApi.createCampaignType(typeForm.value)
-    typeForm.value = { nombre: '', categoria: 'VENTAS', modo_carga: 'MASIVA' }
+    await campaignsApi.createCampaignType({
+      ...typeForm.value,
+      division: esAdminGlobal.value ? typeForm.value.division : undefined,
+    })
+    typeForm.value = { nombre: '', categoria: 'VENTAS', modo_carga: 'MASIVA', division: typeForm.value.division }
     await loadTypes()
   } catch (err: any) {
     error.value = JSON.stringify(err?.response?.data ?? 'No se pudo crear.')
@@ -260,10 +285,28 @@ onMounted(loadTypes)
 <template>
   <div class="space-y-8">
     <div>
-      <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Tipos de campaña</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400">
-        Define el esquema dinámico de cada producto: qué campos captura y cómo se muestran. Solo ADMIN.
-      </p>
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-600/15 dark:text-primary-500">
+            <ClipboardList :size="20" />
+          </span>
+          <div>
+            <h1 class="text-xl font-semibold text-slate-700 dark:text-slate-200">Tipos de campaña</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              Define el esquema dinámico de cada producto: qué campos captura y cómo se muestran.
+              <template v-if="!esAdminGlobal">Tipos de {{ authStore.user?.division_nombre ?? 'tu división' }}.</template>
+            </p>
+          </div>
+        </div>
+        <select
+          v-if="esAdminGlobal"
+          v-model="filtroDivision"
+          class="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+        >
+          <option :value="null">Todas las divisiones</option>
+          <option v-for="d in divisiones" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+        </select>
+      </div>
       <p class="mt-1 text-xs text-slate-400">
         Cada tipo de campaña necesita exactamente un campo marcado "nombre", uno "teléfono" y uno "documento de
         identidad" — son los únicos 3 con comportamiento especial. El documento (no el teléfono) es lo que usa
@@ -286,36 +329,53 @@ onMounted(loadTypes)
       <select v-model="typeForm.modo_carga" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
         <option v-for="m in MODOS_CARGA" :key="m.value" :value="m.value">{{ m.label }}</option>
       </select>
-      <button type="submit" class="col-span-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900">
-        Crear tipo
+      <select
+        v-if="esAdminGlobal"
+        v-model="typeForm.division"
+        required
+        class="col-span-2 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+      >
+        <option :value="null" disabled>División…</option>
+        <option v-for="d in divisiones" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+      </select>
+      <button type="submit" class="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-2 text-sm font-medium text-white">
+        <Plus :size="16" /> Crear tipo
       </button>
     </form>
     <p v-if="error" class="max-w-lg text-xs text-red-600">{{ error }}</p>
 
-    <div v-for="type in types" :key="type.id" class="card p-4">
+    <div v-for="type in tiposVisibles" :key="type.id" class="card p-4">
       <div v-if="editingTypeId === type.id" class="flex items-center gap-2">
         <input v-model="typeEdit.nombre" class="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900" />
         <select v-model="typeEdit.categoria" class="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900">
           <option value="VENTAS">Ventas</option>
           <option value="COBROS">Cobros</option>
         </select>
-        <button class="text-xs text-emerald-600 underline" @click="saveType(type)">Guardar</button>
-        <button class="text-xs text-slate-400 underline" @click="cancelEditType">Cancelar</button>
+        <ActionButton variant="success" icon="save" label="Guardar" @click="saveType(type)" />
+        <ActionButton variant="neutral" icon="cancel" label="Cancelar" @click="cancelEditType" />
       </div>
       <div v-else class="flex items-center justify-between">
-        <h2 class="font-medium text-slate-900 dark:text-slate-100">
+        <h2 class="font-medium text-slate-700 dark:text-slate-200">
           {{ type.nombre }}
-          <span class="text-xs text-slate-400">({{ type.categoria }})</span>
           <span
             class="ml-1 rounded-full px-2 py-0.5 text-xs"
             :class="type.modo_carga === 'INDIVIDUAL' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'"
           >
             {{ type.modo_carga === 'INDIVIDUAL' ? 'Prospección' : 'Campaña (masiva)' }}
           </span>
+          <span
+            class="ml-1 rounded-full px-2 py-0.5 text-xs"
+            :class="type.categoria === 'COBROS' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'"
+          >
+            {{ type.categoria === 'COBROS' ? 'Cobros' : 'Ventas' }}
+          </span>
+          <span v-if="esAdminGlobal" class="ml-1 inline-flex items-center gap-1 text-xs font-normal text-slate-400">
+            <Layers :size="11" class="text-accent-600" /> {{ type.division_nombre }}
+          </span>
         </h2>
-        <span class="flex gap-2 text-xs">
-          <button class="text-slate-500 underline hover:text-slate-800 dark:hover:text-slate-200" @click="startEditType(type)">Editar</button>
-          <button class="text-slate-500 underline hover:text-red-600" @click="handleDeleteType(type)">Eliminar</button>
+        <span class="flex gap-1.5">
+          <ActionButton variant="edit" icon="edit" label="Editar" @click="startEditType(type)" />
+          <ActionButton variant="danger" icon="delete" label="Eliminar" @click="handleDeleteType(type)" />
         </span>
       </div>
 
@@ -398,8 +458,10 @@ onMounted(loadTypes)
                 <span v-if="f.es_documento_identidad" class="rounded bg-slate-200 px-1.5 py-0.5 dark:bg-slate-800">Documento</span>
               </td>
               <td class="py-1 pr-3 whitespace-nowrap">
-                <button class="mr-2 text-slate-500 underline hover:text-slate-800 dark:hover:text-slate-200" @click="startEditField(f)">Editar</button>
-                <button class="text-slate-500 underline hover:text-red-600" @click="handleDeleteField(f)">Eliminar</button>
+                <span class="inline-flex gap-1">
+                  <ActionButton variant="edit" icon="edit" label="Editar" icon-only @click="startEditField(f)" />
+                  <ActionButton variant="danger" icon="delete" label="Eliminar" icon-only @click="handleDeleteField(f)" />
+                </span>
               </td>
             </tr>
           </template>

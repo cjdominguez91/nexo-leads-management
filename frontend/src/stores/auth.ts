@@ -13,6 +13,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => Boolean(accessToken.value && user.value))
   const roleName = computed(() => user.value?.role_nombre ?? null)
+  // Espejo de apps.core.scoping.es_global: solo ADMIN/superusuario cruzan divisiones.
+  // Es solo para la UI (qué mostrar); el backend valida todo por su cuenta.
+  const isGlobalAdmin = computed(() => Boolean(user.value?.is_superuser || roleName.value === 'ADMIN'))
+  const isAdminRole = computed(() => isGlobalAdmin.value || roleName.value === 'ADMIN_DIVISION')
 
   function persistTokens(access: string, refresh: string) {
     localStorage.setItem('nexo_access_token', access)
@@ -84,6 +88,8 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     isAuthenticated,
     roleName,
+    isGlobalAdmin,
+    isAdminRole,
     loadConfig,
     loginLocal,
     loginGoogle,

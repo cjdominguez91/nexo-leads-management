@@ -1,4 +1,10 @@
-export type RoleName = 'ADMIN' | 'GERENTE' | 'SUPERVISOR' | 'JEFE' | 'SUBJEFE' | 'EJECUTIVO'
+export type RoleName = 'ADMIN' | 'ADMIN_DIVISION' | 'GERENTE' | 'SUPERVISOR' | 'JEFE' | 'SUBJEFE' | 'EJECUTIVO'
+
+/** Roles que administran (usuarios, catálogos, campañas). ADMIN_DIVISION, solo su división. */
+export const ADMIN_ROLES: RoleName[] = ['ADMIN', 'ADMIN_DIVISION']
+
+/** Roles que un ADMIN_DIVISION puede asignar (espejo de backend/accounts/constants.py). */
+export const ROLES_GESTIONABLES_POR_ADMIN_DIVISION: RoleName[] = ['GERENTE', 'SUPERVISOR', 'JEFE', 'SUBJEFE', 'EJECUTIVO']
 
 export interface AuthConfig {
   google_enabled: boolean
@@ -37,6 +43,7 @@ export interface NexoUser {
   auth_provider: 'google' | 'local'
   avatar_url: string
   is_active: boolean
+  is_superuser: boolean
   date_joined: string
   last_login: string | null
   agencias: UserAgenciaAsignacion[]

@@ -26,10 +26,10 @@ const pickUser = useUserPicker()
 const campaignId = computed(() => Number(route.params.id))
 const rol = computed(() => authStore.roleName)
 const canUpload = computed(
-  () => authStore.roleName === 'ADMIN' && !campaign.value?.esta_cerrada && campaignType.value?.modo_carga !== 'INDIVIDUAL',
+  () => authStore.isAdminRole && !campaign.value?.esta_cerrada && campaignType.value?.modo_carga !== 'INDIVIDUAL',
 )
 const canAssign = computed(() => authStore.roleName !== 'EJECUTIVO')
-const isAdmin = computed(() => authStore.roleName === 'ADMIN')
+const isAdmin = computed(() => authStore.isAdminRole)
 const esProspeccion = computed(() => campaignType.value?.modo_carga === 'INDIVIDUAL')
 const esEjecutivo = computed(() => rol.value === 'EJECUTIVO')
 const canCreateProspecto = computed(() => esProspeccion.value && !campaign.value?.esta_cerrada)
@@ -178,9 +178,11 @@ async function loadAll() {
     lotes.value = lotesRes.results
     leads.value = leadsRes.results
     leadsCount.value = leadsRes.count
-    asignables.value = asignablesRes.results
-    agencias.value = agenciasRes.results
-    territorios.value = territoriosRes.results
+    // Solo la división de la campaña (un ADMIN global recibe todas).
+    const divisionCampana = campaign.value?.division
+    asignables.value = asignablesRes.results.filter((u) => u.division === divisionCampana || u.division === null)
+    agencias.value = agenciasRes.results.filter((a) => a.division === divisionCampana)
+    territorios.value = territoriosRes.results.filter((t) => t.division === divisionCampana)
   } catch (err: any) {
     loadError.value = err?.response?.data?.detail ?? 'No se pudo cargar la campaña.'
   } finally {
@@ -348,7 +350,7 @@ onUnmounted(() => {
   <div v-if="campaign" class="space-y-8">
     <div class="flex items-start justify-between gap-4">
       <div>
-        <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ campaign.nombre }}</h1>
+        <h1 class="text-xl font-semibold text-slate-700 dark:text-slate-200">{{ campaign.nombre }}</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400">{{ campaign.campaign_type_nombre }} · {{ campaign.division_nombre }}</p>
       </div>
       <div v-if="isAdmin && !editingCampaign" class="flex shrink-0 gap-3 text-xs">
@@ -394,7 +396,7 @@ onUnmounted(() => {
       </div>
 
       <div class="col-span-2 flex gap-3">
-        <button class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900" @click="saveCampaign">Guardar</button>
+        <button class="rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-2 text-sm font-medium text-white" @click="saveCampaign">Guardar</button>
         <button class="text-sm text-slate-400 underline" @click="cancelEditCampaign">Cancelar</button>
       </div>
       <p v-if="campaignEditError" class="col-span-2 text-xs text-red-600">{{ campaignEditError }}</p>
@@ -412,7 +414,7 @@ onUnmounted(() => {
       <form class="space-y-3" @submit.prevent="handleUpload">
         <div class="flex flex-wrap items-center gap-3">
           <input ref="fileInput" type="file" accept=".csv,.xlsx" class="text-sm" />
-          <button type="submit" :disabled="uploading" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900">
+          <button type="submit" :disabled="uploading" class="rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
             {{ uploading ? 'Subiendo…' : 'Subir' }}
           </button>
         </div>
@@ -517,7 +519,7 @@ onUnmounted(() => {
         <button
           type="submit"
           :disabled="prospectoSubmitting"
-          class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+          class="rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {{ prospectoSubmitting ? 'Registrando…' : 'Registrar prospecto' }}
         </button>
@@ -536,7 +538,7 @@ onUnmounted(() => {
         <div v-if="canAssign && selectedLeadIds.length" class="flex items-center gap-2 text-sm">
           <span class="text-slate-500">{{ selectedLeadIds.length }} seleccionados</span>
           <button
-            class="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white dark:bg-slate-100 dark:text-slate-900"
+            class="flex items-center gap-1.5 rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-1.5 text-sm text-white"
             @click="handleBulkAssign"
           >
             <UserSearch :size="16" /> Asignar a…

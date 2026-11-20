@@ -87,9 +87,13 @@ def _parse_row(
     else:
         agencia_codigo = (row.get("agencia_codigo") or "").strip()
         try:
-            agencia = Agencia.objects.select_related("territorio").get(codigo=agencia_codigo, activo=True)
+            # Solo agencias de la división de la campaña: un código de agencia
+            # de otra división se reporta como inexistente para esta carga.
+            agencia = Agencia.objects.select_related("territorio").get(
+                codigo=agencia_codigo, activo=True, territorio__division_id=campaign.division_id
+            )
         except Agencia.DoesNotExist:
-            raise ValueError(f"Agencia con código '{agencia_codigo}' no existe o está inactiva.")
+            raise ValueError(f"Agencia con código '{agencia_codigo}' no existe, está inactiva o es de otra división.")
 
     if lote.distrito_restriccion_id and agencia.territorio_id != lote.distrito_restriccion_id:
         raise ValueError("La agencia del registro no pertenece al distrito restringido de este lote.")

@@ -38,9 +38,7 @@ const SORT_OPTIONS = [
   { value: 'estado', label: 'Estado' },
 ]
 
-const isAdmin = computed(() => authStore.roleName === 'ADMIN')
-const agenciaOptions = computed(() => agencias.value.map((a) => ({ id: a.id, label: a.nombre })))
-const territorioOptions = computed(() => territorios.value.map((t) => ({ id: t.id, label: t.nombre })))
+const isAdmin = computed(() => authStore.isAdminRole)
 
 const form = ref({
   nombre: '',
@@ -51,6 +49,16 @@ const form = ref({
   agencias_habilitadas: [] as number[],
   distritos_habilitados: [] as number[],
 })
+
+// Tipo, agencias y distritos deben ser de la división elegida (el backend lo
+// valida igual). Para ADMIN_DIVISION solo hay una opción: la suya.
+const tiposDeLaDivision = computed(() => campaignTypes.value.filter((ct) => ct.division === form.value.division))
+const agenciaOptions = computed(() =>
+  agencias.value.filter((a) => a.division === form.value.division).map((a) => ({ id: a.id, label: a.nombre })),
+)
+const territorioOptions = computed(() =>
+  territorios.value.filter((t) => t.division === form.value.division).map((t) => ({ id: t.id, label: t.nombre })),
+)
 
 async function loadData() {
   loading.value = true
@@ -111,7 +119,7 @@ onMounted(loadData)
 <template>
   <div class="space-y-8">
     <div>
-      <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Campañas</h1>
+      <h1 class="text-xl font-semibold text-slate-700 dark:text-slate-200">Campañas</h1>
       <p class="text-sm text-slate-500 dark:text-slate-400">Bases de leads por campaña de producto.</p>
     </div>
 
@@ -119,7 +127,7 @@ onMounted(loadData)
       <input v-model="form.nombre" placeholder="Nombre de la campaña" required class="col-span-2 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900" />
       <select v-model="form.campaign_type" required class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
         <option :value="null" disabled>Tipo de campaña…</option>
-        <option v-for="ct in campaignTypes" :key="ct.id" :value="ct.id">{{ ct.nombre }}</option>
+        <option v-for="ct in tiposDeLaDivision" :key="ct.id" :value="ct.id">{{ ct.nombre }}</option>
       </select>
       <select v-model="form.division" required class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
         <option :value="null" disabled>División…</option>
@@ -156,7 +164,7 @@ onMounted(loadData)
         />
       </div>
 
-      <button type="submit" class="col-span-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900">
+      <button type="submit" class="col-span-2 rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-2 text-sm font-medium text-white">
         Crear campaña
       </button>
       <p v-if="error" class="col-span-2 text-xs text-red-600">{{ error }}</p>
@@ -188,7 +196,7 @@ onMounted(loadData)
           class="card p-4 text-left hover:border-slate-400 dark:hover:border-slate-600"
           @click="goToCampaign(campaign)"
         >
-          <p class="font-medium text-slate-900 dark:text-slate-100">{{ campaign.nombre }}</p>
+          <p class="font-medium text-slate-700 dark:text-slate-200">{{ campaign.nombre }}</p>
           <p class="text-xs text-slate-500 dark:text-slate-400">{{ campaign.campaign_type_nombre }}</p>
           <p class="mt-1 text-xs text-slate-400">
             {{ campaign.fecha_inicio }}<span v-if="campaign.fecha_fin"> — {{ campaign.fecha_fin }}</span>

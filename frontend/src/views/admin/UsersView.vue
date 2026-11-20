@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { ArrowDown, ArrowUp, ArrowUpDown } from '@lucide/vue'
+import { ArrowDown, ArrowUp, ArrowUpDown, Layers, Lock, UserPlus, Users as UsersIcon } from '@lucide/vue'
 import { createColumnHelper, FlexRender, getCoreRowModel, useVueTable } from '@tanstack/vue-table'
 import { computed, onMounted, ref } from 'vue'
 
 import * as accountsApi from '@/api/accounts'
 import type { Division, Role } from '@/api/accounts'
+import { ROLES_GESTIONABLES_POR_ADMIN_DIVISION } from '@/api/types'
 import type { NexoUser } from '@/api/types'
 import * as geoApi from '@/api/geo'
 import type { Agencia, Territorio } from '@/api/geo'
+import ActionButton from '@/components/ActionButton.vue'
 import MultiSelectPicker from '@/components/MultiSelectPicker.vue'
 import SingleSelectPicker from '@/components/SingleSelectPicker.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import TablePagination from '@/components/TablePagination.vue'
 import { useConfirm } from '@/composables/useConfirm'
+import { useAuthStore } from '@/stores/auth'
 
 // Igual que en DynamicTable.vue: guarda el query param de filtro de cada
 // columna en su columnDef (meta.filterParam).
@@ -22,6 +26,39 @@ declare module '@tanstack/vue-table' {
 }
 
 const confirm = useConfirm()
+const authStore = useAuthStore()
+
+// ADMIN global elige división y cualquier rol. ADMIN_DIVISION: división fija
+// (la suya) y solo roles de Gerente hacia abajo. Es solo UI: el backend
+// rechaza cualquier otra cosa igual (accounts.serializers).
+const esAdminGlobal = computed(() => authStore.isGlobalAdmin)
+const rolesAsignables = computed(() =>
+  esAdminGlobal.value ? roles.value : roles.value.filter((r) => ROLES_GESTIONABLES_POR_ADMIN_DIVISION.includes(r.nombre as never)),
+)
+function puedoGestionar(user: NexoUser) {
+  return esAdminGlobal.value || !user.role_nombre || ROLES_GESTIONABLES_POR_ADMIN_DIVISION.includes(user.role_nombre)
+}
+const ROLES_TODA_LA_DIVISION = ['ADMIN_DIVISION', 'GERENTE']
+
+// Un color por nivel jerárquico: de más poder (violeta/índigo) a operación (gris).
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: 'Administrador',
+  ADMIN_DIVISION: 'Admin de división',
+  GERENTE: 'Gerente',
+  SUPERVISOR: 'Supervisor',
+  JEFE: 'Jefe',
+  SUBJEFE: 'Subjefe',
+  EJECUTIVO: 'Ejecutivo',
+}
+const ROLE_BADGE: Record<string, string> = {
+  ADMIN: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+  ADMIN_DIVISION: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+  GERENTE: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+  SUPERVISOR: 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300',
+  JEFE: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  SUBJEFE: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300',
+  EJECUTIVO: 'bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300',
+}
 
 const users = ref<NexoUser[]>([])
 const usersCount = ref(0)
@@ -73,13 +110,24 @@ const form = ref({
 
 const selectedRoleNombre = computed(() => roles.value.find((r) => r.id === form.value.role)?.nombre ?? null)
 
+// En el panel de "Alcance", solo agencias/distritos de la división del usuario
+// que se está editando (el backend rechaza asignar de otra división).
+const expandedUser = computed(() => users.value.find((u) => u.id === expandedUserId.value) ?? null)
+const territoriosDeLaDivision = computed(() =>
+  territorios.value.filter((t) => !expandedUser.value?.division || t.division === expandedUser.value.division),
+)
 const agenciasFiltradas = computed(() =>
-  pendingAgenciaDistrito.value
-    ? agencias.value.filter((a) => a.territorio === pendingAgenciaDistrito.value)
-    : agencias.value,
+  agencias.value
+    .filter((a) => !expandedUser.value?.division || a.division === expandedUser.value.division)
+    .filter((a) => !pendingAgenciaDistrito.value || a.territorio === pendingAgenciaDistrito.value),
 )
 const agenciaPickerOptions = computed(() => agenciasFiltradas.value.map((a) => ({ id: a.id, label: a.nombre })))
-const territorioPickerOptions = computed(() => territorios.value.map((t) => ({ id: t.id, label: t.nombre })))
+const territorioPickerOptions = computed(() => territoriosDeLaDivision.value.map((t) => ({ id: t.id, label: t.nombre })))
+// En el alta, la agencia de un EJECUTIVO debe ser de la división elegida.
+const agenciasAlta = computed(() => {
+  const division = esAdminGlobal.value ? form.value.division : authStore.user?.division
+  return division ? agencias.value.filter((a) => a.division === division) : agencias.value
+})
 
 function usersParams() {
   return {
@@ -302,9 +350,16 @@ onMounted(loadData)
 
 <template>
   <div class="space-y-8">
-    <div>
-      <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Usuarios</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400">Alta, rol, alcance territorial y activación de cuentas. Solo ADMIN.</p>
+    <div class="flex items-start gap-3">
+      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-600/15 dark:text-primary-500">
+        <UsersIcon :size="20" />
+      </span>
+      <div>
+        <h1 class="text-xl font-semibold text-slate-700 dark:text-slate-200">Usuarios</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400">
+          Alta, rol, alcance territorial y activación de cuentas{{ esAdminGlobal ? '' : ` de ${authStore.user?.division_nombre ?? 'tu división'}` }}.
+        </p>
+      </div>
     </div>
 
     <form class="card grid max-w-2xl grid-cols-2 gap-3 p-4" @submit.prevent="handleCreate">
@@ -319,31 +374,37 @@ onMounted(loadData)
       />
       <select v-model="form.role" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
         <option :value="null">Sin rol</option>
-        <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.nombre_display }}</option>
+        <option v-for="role in rolesAsignables" :key="role.id" :value="role.id">{{ role.nombre_display }}</option>
       </select>
-      <select v-model="form.division" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
+      <select v-if="esAdminGlobal" v-model="form.division" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
         <option :value="null">División…</option>
         <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.nombre }}</option>
       </select>
+      <div v-else class="flex items-center gap-2 rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 dark:border-slate-700">
+        <Layers :size="14" class="text-accent-600" />
+        {{ authStore.user?.division_nombre }}
+      </div>
       <select
         v-if="selectedRoleNombre === 'EJECUTIVO'"
         v-model="form.agencia_principal"
         class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
       >
         <option :value="null">Agencia (obligatoria para EJECUTIVO)…</option>
-        <option v-for="a in agencias" :key="a.id" :value="a.id">{{ a.nombre }}</option>
+        <option v-for="a in agenciasAlta" :key="a.id" :value="a.id">{{ a.nombre }}</option>
       </select>
       <p v-else-if="selectedRoleNombre && ['JEFE', 'SUBJEFE', 'SUPERVISOR'].includes(selectedRoleNombre)" class="col-span-2 text-xs text-slate-400">
         {{ selectedRoleNombre === 'SUPERVISOR' ? 'Los distritos' : 'Las agencias' }} se asignan después de crear el usuario, desde "Alcance" en la tabla de abajo — un {{ selectedRoleNombre.toLowerCase() }} puede cubrir varios.
       </p>
       <input v-model="form.password" type="password" placeholder="Contraseña (login local)" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900" />
-      <button type="submit" :disabled="submitting" class="col-span-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900">
+      <button type="submit" :disabled="submitting" class="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
+        <UserPlus :size="16" />
         {{ submitting ? 'Creando…' : 'Crear usuario' }}
       </button>
       <p v-if="formError" class="col-span-2 text-xs text-red-600">{{ formError }}</p>
     </form>
 
-    <table class="card w-full text-left text-sm p-4">
+    <div class="card overflow-x-auto">
+    <table class="data-table">
       <thead class="text-slate-500 dark:text-slate-400">
         <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
           <th
@@ -427,10 +488,10 @@ onMounted(loadData)
                     class="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
                   >
                     <option :value="null">Sin rol</option>
-                    <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.nombre_display }}</option>
+                    <option v-for="role in rolesAsignables" :key="role.id" :value="role.id">{{ role.nombre_display }}</option>
                   </select>
                 </div>
-                <div>
+                <div v-if="esAdminGlobal">
                   <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400" :for="`edit-division-${user.id}`">División</label>
                   <select
                     :id="`edit-division-${user.id}`"
@@ -442,30 +503,40 @@ onMounted(loadData)
                   </select>
                 </div>
               </div>
-              <p class="mt-2 text-xs text-slate-400">
-                La división determina qué campañas puede ver este usuario — debe coincidir con la división de la campaña.
+              <p v-if="esAdminGlobal" class="mt-2 text-xs text-slate-400">
+                La división determina qué campañas, agencias y catálogos puede ver este usuario.
               </p>
-              <div class="mt-3 flex gap-3">
-                <button class="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white dark:bg-slate-100 dark:text-slate-900" @click="saveEditUser(user)">
-                  Guardar
-                </button>
-                <button class="text-xs text-slate-400 underline" @click="cancelEditUser">Cancelar</button>
+              <div class="mt-3 flex gap-2">
+                <ActionButton variant="success" icon="save" label="Guardar" @click="saveEditUser(user)" />
+                <ActionButton variant="neutral" icon="cancel" label="Cancelar" @click="cancelEditUser" />
               </div>
             </td>
           </tr>
-          <tr v-else class="text-slate-800 dark:text-slate-200">
+          <tr v-else class="text-slate-600 dark:text-slate-200">
             <td class="border-b border-slate-100 py-2 dark:border-slate-900">
               {{ user.email }}
               <span v-if="user.codigo_empleado" class="block text-xs text-slate-400">{{ user.codigo_empleado }}</span>
             </td>
-            <td class="border-b border-slate-100 py-2 dark:border-slate-900">{{ user.role_nombre ?? '—' }}</td>
+            <td class="border-b border-slate-100 py-2 dark:border-slate-900">
+              <span
+                v-if="user.role_nombre"
+                class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                :class="ROLE_BADGE[user.role_nombre]"
+              >
+                {{ ROLE_LABEL[user.role_nombre] }}
+              </span>
+              <span v-else class="text-slate-400">—</span>
+            </td>
             <td class="border-b border-slate-100 py-2 text-xs dark:border-slate-900">
-              <span v-if="user.division_nombre">{{ user.division_nombre }}</span>
-              <span v-else-if="['ADMIN', 'GERENTE'].includes(user.role_nombre ?? '')" class="text-slate-400">—</span>
+              <span v-if="user.division_nombre" class="inline-flex items-center gap-1">
+                <Layers :size="12" class="text-accent-600" />{{ user.division_nombre }}
+              </span>
+              <span v-else-if="user.role_nombre === 'ADMIN'" class="text-slate-400">—</span>
               <span v-else class="text-amber-600">⚠ sin división</span>
             </td>
             <td class="border-b border-slate-100 py-2 text-xs dark:border-slate-900">
-              <span v-if="['ADMIN', 'GERENTE'].includes(user.role_nombre ?? '')" class="text-slate-400">Global</span>
+              <span v-if="user.role_nombre === 'ADMIN'" class="text-slate-400">Global</span>
+              <span v-else-if="ROLES_TODA_LA_DIVISION.includes(user.role_nombre ?? '')" class="text-slate-400">Toda la división</span>
               <span v-else-if="user.role_nombre === 'EJECUTIVO'">{{ user.agencia_principal_nombre ?? '⚠ sin agencia' }}</span>
               <span v-else-if="['JEFE', 'SUBJEFE'].includes(user.role_nombre ?? '')">
                 {{ user.agencias.filter((a) => a.activo).map((a) => a.agencia_nombre).join(', ') || '⚠ sin agencias' }}
@@ -476,20 +547,24 @@ onMounted(loadData)
               <span v-else class="text-slate-400">—</span>
             </td>
             <td class="border-b border-slate-100 py-2 dark:border-slate-900">
-              <span :class="user.is_active ? 'text-emerald-600' : 'text-slate-400'">
-                {{ user.is_active ? 'Activo' : 'Inactivo' }}
-              </span>
+              <StatusBadge :active="user.is_active" />
             </td>
-            <td class="border-b border-slate-100 py-2 text-right dark:border-slate-900">
-              <button class="mr-3 text-xs text-slate-500 underline hover:text-slate-800 dark:hover:text-slate-200" @click="startEditUser(user)">
-                Editar
-              </button>
-              <button class="mr-3 text-xs text-slate-500 underline hover:text-slate-800 dark:hover:text-slate-200" @click="toggleExpand(user)">
-                Alcance
-              </button>
-              <button class="text-xs text-slate-500 underline hover:text-slate-800 dark:hover:text-slate-200" @click="toggleActive(user)">
-                {{ user.is_active ? 'Desactivar' : 'Activar' }}
-              </button>
+            <td class="border-b border-slate-100 py-2 dark:border-slate-900">
+              <div v-if="puedoGestionar(user)" class="flex justify-end gap-1.5">
+                <ActionButton variant="edit" icon="edit" label="Editar" @click="startEditUser(user)" />
+                <ActionButton variant="scope" icon="scope" label="Alcance" @click="toggleExpand(user)" />
+                <ActionButton
+                  v-if="user.is_active"
+                  variant="danger"
+                  icon="deactivate"
+                  label="Desactivar"
+                  @click="toggleActive(user)"
+                />
+                <ActionButton v-else variant="success" icon="activate" label="Activar" @click="toggleActive(user)" />
+              </div>
+              <span v-else class="flex items-center justify-end gap-1 text-xs text-slate-400" title="Solo un administrador global puede modificar este usuario">
+                <Lock :size="12" /> Solo lectura
+              </span>
             </td>
           </tr>
           <tr v-if="editError && editingUserId === user.id">
@@ -502,12 +577,12 @@ onMounted(loadData)
                 <div class="flex items-start gap-2">
                   <select v-model="pendingAgenciaDistrito" class="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900">
                     <option :value="null">Todos los distritos</option>
-                    <option v-for="t in territorios" :key="t.id" :value="t.id">{{ t.nombre }}</option>
+                    <option v-for="t in territoriosDeLaDivision" :key="t.id" :value="t.id">{{ t.nombre }}</option>
                   </select>
                   <div class="w-64">
                     <SingleSelectPicker v-model="pendingAgenciaPrincipal" :options="agenciaPickerOptions" placeholder="Buscar agencia…" />
                   </div>
-                  <button class="shrink-0 rounded-md bg-slate-900 px-3 py-2 text-xs text-white dark:bg-slate-100 dark:text-slate-900" @click="handleSetAgenciaPrincipal(user)">
+                  <button class="shrink-0 rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-2 text-xs text-white" @click="handleSetAgenciaPrincipal(user)">
                     Guardar
                   </button>
                 </div>
@@ -519,13 +594,13 @@ onMounted(loadData)
                   <span class="shrink-0 text-xs text-slate-400">Filtrar por distrito:</span>
                   <select v-model="pendingAgenciaDistrito" class="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900">
                     <option :value="null">Todos los distritos</option>
-                    <option v-for="t in territorios" :key="t.id" :value="t.id">{{ t.nombre }}</option>
+                    <option v-for="t in territoriosDeLaDivision" :key="t.id" :value="t.id">{{ t.nombre }}</option>
                   </select>
                 </div>
                 <div class="max-w-md">
                   <MultiSelectPicker v-model="pendingAgenciasSet" :options="agenciaPickerOptions" placeholder="Buscar agencia…" />
                 </div>
-                <button class="rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white dark:bg-slate-100 dark:text-slate-900" @click="handleSaveAgencias(user)">
+                <button class="rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-1.5 text-xs text-white" @click="handleSaveAgencias(user)">
                   Guardar
                 </button>
               </div>
@@ -535,13 +610,19 @@ onMounted(loadData)
                 <div class="max-w-md">
                   <MultiSelectPicker v-model="pendingTerritoriosSet" :options="territorioPickerOptions" placeholder="Buscar distrito…" />
                 </div>
-                <button class="rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white dark:bg-slate-100 dark:text-slate-900" @click="handleSaveTerritorios(user)">
+                <button class="rounded-md bg-primary-600 hover:bg-primary-700 transition-colors px-3 py-1.5 text-xs text-white" @click="handleSaveTerritorios(user)">
                   Guardar
                 </button>
               </div>
 
               <p v-else class="text-sm text-slate-400">
-                {{ user.role_nombre ? 'Este rol tiene alcance global, no requiere agencia/distrito.' : 'Asigna un rol primero.' }}
+                {{
+                  !user.role_nombre
+                    ? 'Asigna un rol primero.'
+                    : user.role_nombre === 'ADMIN'
+                      ? 'Este rol tiene alcance global, no requiere agencia/distrito.'
+                      : 'Este rol ve toda su división, no requiere agencia/distrito.'
+                }}
               </p>
 
               <p v-if="scopeError" class="mt-2 text-xs text-red-600">{{ scopeError }}</p>
@@ -553,6 +634,7 @@ onMounted(loadData)
         </tr>
       </tbody>
     </table>
+    </div>
     <TablePagination :page="usersPage" :page-size="usersPageSize" :count="usersCount" @update:page="handleUsersPage" />
     <p v-if="loading" class="text-sm text-slate-400">Cargando…</p>
   </div>

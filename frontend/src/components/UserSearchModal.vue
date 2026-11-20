@@ -43,7 +43,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   >
     <div class="card flex max-h-[65vh] w-full max-w-lg flex-col rounded-xl shadow-xl">
       <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-        <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ store.title }}</h2>
+        <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ store.title }}</h2>
         <button class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" @click="store.cancel()">
           <X :size="18" />
         </button>
@@ -71,7 +71,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           @click="store.select(user)"
         >
           <div class="min-w-0">
-            <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+            <p class="truncate text-sm font-medium text-slate-600 dark:text-slate-200">
               {{ user.first_name }} {{ user.last_name }}
             </p>
             <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ user.email }}</p>

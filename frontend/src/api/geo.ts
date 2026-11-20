@@ -5,6 +5,8 @@ export interface Territorio {
   id: number
   nombre: string
   codigo: string
+  division: number
+  division_nombre: string
   activo: boolean
 }
 
@@ -14,6 +16,9 @@ export interface Agencia {
   codigo: string
   territorio: number
   territorio_nombre: string
+  /** Derivada del distrito (solo lectura). */
+  division: number
+  division_nombre: string
   activo: boolean
 }
 
@@ -21,7 +26,8 @@ export function fetchTerritorios() {
   return apiClient.get<Paginated<Territorio>>('/geo/territorios/').then((res) => res.data)
 }
 
-export function createTerritorio(payload: { nombre: string; codigo: string }) {
+/** `division` solo la usa ADMIN global; para ADMIN_DIVISION el backend fija la suya. */
+export function createTerritorio(payload: { nombre: string; codigo: string; division?: number | null }) {
   return apiClient.post<Territorio>('/geo/territorios/', payload).then((res) => res.data)
 }
 

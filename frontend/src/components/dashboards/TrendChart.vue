@@ -146,7 +146,7 @@ function onLeave() {
         <p class="mb-1 font-medium text-slate-700 dark:text-slate-200">{{ formatDate(labels[hoverIndex]) }}</p>
         <p v-for="s in series" :key="s.name" class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
           <span class="inline-block h-0.5 w-3 rounded-full" :style="{ backgroundColor: s.color }" />
-          <span class="font-semibold tabular-nums text-slate-800 dark:text-slate-100">{{ s.points[hoverIndex]?.value ?? 0 }}</span>
+          <span class="font-semibold tabular-nums text-slate-600 dark:text-slate-200">{{ s.points[hoverIndex]?.value ?? 0 }}</span>
           {{ s.name }}
         </p>
       </div>

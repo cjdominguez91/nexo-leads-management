@@ -26,18 +26,32 @@ class RoleRequired(BasePermission):
 
 
 class IsAdmin(RoleRequired):
+    """Solo ADMIN global. Para lo que cruza divisiones (ej. CRUD de Division)."""
+
     allowed_roles = (RoleNames.ADMIN,)
 
 
+class IsAdminRole(RoleRequired):
+    """ADMIN o ADMIN_DIVISION. Este permiso solo responde "¿es un rol de
+    administración?"; que un ADMIN_DIVISION no toque otra división lo
+    garantiza el queryset (apps.core.scoping.filtrar_por_division) más la
+    validación del serializer. Nunca usar esto solo, sin el filtro."""
+
+    allowed_roles = (RoleNames.ADMIN, RoleNames.ADMIN_DIVISION)
+
+
 class IsAdminOrGerente(RoleRequired):
-    allowed_roles = (RoleNames.ADMIN, RoleNames.GERENTE)
+    """Lectura amplia (auditoría). GERENTE y ADMIN_DIVISION, solo de su división."""
+
+    allowed_roles = (RoleNames.ADMIN, RoleNames.ADMIN_DIVISION, RoleNames.GERENTE)
 
 
 class IsSupervisionRole(RoleRequired):
-    """ADMIN/GERENTE globales + SUPERVISOR/JEFE/SUBJEFE dentro de su scope territorial."""
+    """Roles que asignan leads, cada uno dentro de su alcance."""
 
     allowed_roles = (
         RoleNames.ADMIN,
+        RoleNames.ADMIN_DIVISION,
         RoleNames.GERENTE,
         RoleNames.SUPERVISOR,
         RoleNames.JEFE,

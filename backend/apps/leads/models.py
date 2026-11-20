@@ -7,7 +7,12 @@ from apps.core.models import CatalogModel, TimeStampedModel
 class Category(CatalogModel):
     """Catálogo de tipificación. También cubre los antiguos "Motivos-NA" /
     "Motivos-NI" del sistema legado: son Category con sus propias
-    SubCategory, no un modelo aparte."""
+    SubCategory, no un modelo aparte.
+
+    Pertenece a una División (sus SubCategory la heredan vía `category`): un
+    lead solo se puede tipificar con categorías de la división de su campaña."""
+
+    division = models.ForeignKey("accounts.Division", on_delete=models.PROTECT, related_name="categorias")
 
     class Meta(CatalogModel.Meta):
         verbose_name = "Categoría"

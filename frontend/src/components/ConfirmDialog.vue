@@ -32,7 +32,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           <CircleHelp v-else :size="20" class="text-brand-600 dark:text-brand-400" />
         </div>
         <div class="flex-1 pt-1">
-          <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ store.options.title }}</h2>
+          <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ store.options.title }}</h2>
           <p v-if="store.options.message" class="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {{ store.options.message }}
           </p>

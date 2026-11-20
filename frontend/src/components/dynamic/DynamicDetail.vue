@@ -47,19 +47,19 @@ const sections = computed(() => {
       <dl class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
         <div>
           <dt class="text-slate-400">{{ documentoField?.label ?? 'Documento' }}</dt>
-          <dd class="font-medium text-slate-800 dark:text-slate-200">{{ lead.documento_identidad }}</dd>
+          <dd class="font-medium text-slate-600 dark:text-slate-200">{{ lead.documento_identidad }}</dd>
         </div>
         <div>
           <dt class="text-slate-400">{{ nombreField?.label ?? 'Nombre' }}</dt>
-          <dd class="text-slate-800 dark:text-slate-200">{{ lead.cliente_nombre || lead.documento_identidad }}</dd>
+          <dd class="text-slate-600 dark:text-slate-200">{{ lead.cliente_nombre || lead.documento_identidad }}</dd>
         </div>
         <div>
           <dt class="text-slate-400">{{ telefonoField?.label ?? 'Teléfono' }}</dt>
-          <dd class="text-slate-800 dark:text-slate-200">{{ lead.telefono || '—' }}</dd>
+          <dd class="text-slate-600 dark:text-slate-200">{{ lead.telefono || '—' }}</dd>
         </div>
-        <div><dt class="text-slate-400">Agencia</dt><dd class="text-slate-800 dark:text-slate-200">{{ lead.agencia_nombre }}</dd></div>
-        <div><dt class="text-slate-400">Estado</dt><dd class="text-slate-800 dark:text-slate-200">{{ lead.estado }}</dd></div>
-        <div><dt class="text-slate-400">Asignado a</dt><dd class="text-slate-800 dark:text-slate-200">{{ lead.usuario_asignado_email ?? '—' }}</dd></div>
+        <div><dt class="text-slate-400">Agencia</dt><dd class="text-slate-600 dark:text-slate-200">{{ lead.agencia_nombre }}</dd></div>
+        <div><dt class="text-slate-400">Estado</dt><dd class="text-slate-600 dark:text-slate-200">{{ lead.estado }}</dd></div>
+        <div><dt class="text-slate-400">Asignado a</dt><dd class="text-slate-600 dark:text-slate-200">{{ lead.usuario_asignado_email ?? '—' }}</dd></div>
       </dl>
     </section>
 
@@ -68,7 +68,7 @@ const sections = computed(() => {
       <dl class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
         <div v-for="field in group.fields" :key="field.field_key">
           <dt class="text-slate-400">{{ field.label }}</dt>
-          <dd class="text-slate-800 dark:text-slate-200">
+          <dd class="text-slate-600 dark:text-slate-200">
             {{ formatFieldValue(lead.atributos[field.field_key], field.data_type) }}
           </dd>
         </div>

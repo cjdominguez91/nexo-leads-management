@@ -48,6 +48,8 @@ export interface Assignment {
 export interface Category {
   id: number
   nombre: string
+  division: number
+  division_nombre: string
   activo: boolean
 }
 
@@ -57,6 +59,8 @@ export interface SubCategory {
   id: number
   category: number
   category_nombre: string
+  /** Derivada de la categoría (solo lectura). */
+  division: number
   nombre: string
   efecto: SubCategoryEfecto
   efecto_display: string
@@ -98,6 +102,7 @@ export interface AsignableUser {
   first_name: string
   last_name: string
   role_nombre: string | null
+  division: number | null
   agencia_principal_nombre: string | null
 }
 
@@ -138,7 +143,8 @@ export function fetchCategories() {
   return apiClient.get<Paginated<Category>>('/leads/categories/').then((res) => res.data)
 }
 
-export function createCategory(payload: { nombre: string }) {
+/** `division` solo la usa ADMIN global; para ADMIN_DIVISION el backend fija la suya. */
+export function createCategory(payload: { nombre: string; division?: number | null }) {
   return apiClient.post<Category>('/leads/categories/', payload).then((res) => res.data)
 }
 

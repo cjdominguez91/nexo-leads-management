@@ -28,7 +28,7 @@ const themeStore = useThemeStore()
 
 const rol = computed(() => authStore.roleName)
 const esEjecutivo = computed(() => rol.value === 'EJECUTIVO')
-const esAdminOGerente = computed(() => rol.value === 'ADMIN' || rol.value === 'GERENTE')
+const esAdminOGerente = computed(() => authStore.isAdminRole || rol.value === 'GERENTE')
 
 // Qué tabs puede ver cada rol (ver sección 6 del pedido: Admin/Gerente sin
 // restricción; Supervisor no necesita "por Distrito" porque ya está
@@ -36,6 +36,7 @@ const esAdminOGerente = computed(() => rol.value === 'ADMIN' || rol.value === 'G
 // el mismo motivo — comparar contra sí mismos no aporta.
 const TAB_ACCESS: Record<string, Tab[]> = {
   ADMIN: ['general', 'distrito', 'agencia', 'ejecutivo'],
+  ADMIN_DIVISION: ['general', 'distrito', 'agencia', 'ejecutivo'],
   GERENTE: ['general', 'distrito', 'agencia', 'ejecutivo'],
   SUPERVISOR: ['general', 'agencia', 'ejecutivo'],
   JEFE: ['general', 'ejecutivo'],
@@ -71,7 +72,9 @@ const filtros = ref({
   distrito: null as number | null,
   usuario_asignado: null as number | null,
 })
-const rangoPreset = ref<'7' | '30' | '90' | 'todo'>('30')
+// Rango temporal SOLO para la gráfica de tendencia. Los KPIs, estados y
+// efectividad miden la campaña completa (todo el histórico), sin recorte.
+const rangoTendencia = ref<'7' | '30' | '90' | 'todo'>('todo')
 
 const RANGO_OPTIONS = [
   { value: '7', label: 'Últimos 7 días' },
@@ -171,27 +174,36 @@ const trendSeries = computed(() => {
   ]
 })
 
-function diasDelRango(): number {
-  return rangoPreset.value === 'todo' ? 0 : Number(rangoPreset.value)
+// Fecha local YYYY-MM-DD (toISOString usaría UTC y en la tarde/noche
+// local desplazaría el día al siguiente).
+function isoLocal(d: Date) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
 }
-function fechaDesde(): string | undefined {
-  const dias = diasDelRango()
-  if (!dias) return undefined
-  const d = new Date()
-  d.setDate(d.getDate() - dias)
-  return d.toISOString().slice(0, 10)
-}
-function buildContinuousSeries(raw: { fecha: string; cantidad: number }[], dias: number) {
+
+// Rellena con 0 los días sin actividad, desde `desde` hasta hoy, para que la
+// línea sea continua. En "todo el histórico" `desde` es el primer día con datos.
+function buildContinuousSeries(raw: { fecha: string; cantidad: number }[], desde: Date) {
   const map = new Map(raw.map((r) => [r.fecha, r.cantidad]))
   const points: { date: string; value: number }[] = []
-  const hoy = new Date()
-  for (let i = dias - 1; i >= 0; i--) {
-    const d = new Date(hoy)
-    d.setDate(d.getDate() - i)
-    const iso = d.toISOString().slice(0, 10)
+  const hoy = isoLocal(new Date())
+  for (const d = new Date(desde); isoLocal(d) <= hoy; d.setDate(d.getDate() + 1)) {
+    const iso = isoLocal(d)
     points.push({ date: iso, value: map.get(iso) ?? 0 })
   }
   return points
+}
+
+function inicioTendencia(fechasConDatos: string[]): Date | null {
+  if (rangoTendencia.value !== 'todo') {
+    const d = new Date()
+    d.setDate(d.getDate() - (Number(rangoTendencia.value) - 1))
+    return d
+  }
+  if (!fechasConDatos.length) return null
+  const [y, m, dd] = fechasConDatos.reduce((min, f) => (f < min ? f : min)).split('-').map(Number)
+  return new Date(y, m - 1, dd)
 }
 
 function filtrosParams() {
@@ -200,25 +212,31 @@ function filtrosParams() {
     agencia: filtros.value.agencia ?? undefined,
     distrito: filtros.value.distrito ?? undefined,
     usuario_asignado: esEjecutivo.value ? undefined : (filtros.value.usuario_asignado ?? undefined),
-    fecha_desde: fechaDesde(),
   }
+}
+
+async function loadTendencia() {
+  const dias = rangoTendencia.value === 'todo' ? 0 : Number(rangoTendencia.value)
+  const res = await dashboardsApi.fetchTendencia({ ...filtrosParams(), dias })
+  const desde = inicioTendencia([...res.gestiones_por_dia, ...res.ganadas_por_dia].map((r) => r.fecha))
+  tendencia.value = desde
+    ? {
+        gestiones: buildContinuousSeries(res.gestiones_por_dia, desde),
+        ganadas: buildContinuousSeries(res.ganadas_por_dia, desde),
+      }
+    : { gestiones: [], ganadas: [] }
 }
 
 async function loadDashboard() {
   loading.value = true
   try {
-    const diasTendencia = diasDelRango() || 90
     const agruparPor = AGRUPAR_POR_TAB[activeTab.value]
-    const [resumenRes, tendenciaRes, efectividadRes] = await Promise.all([
+    const [resumenRes, efectividadRes] = await Promise.all([
       dashboardsApi.fetchResumen(filtrosParams()),
-      dashboardsApi.fetchTendencia({ ...filtrosParams(), dias: diasTendencia }),
       dashboardsApi.fetchEfectividad(agruparPor, filtrosParams()),
+      loadTendencia(),
     ])
     resumen.value = resumenRes
-    tendencia.value = {
-      gestiones: buildContinuousSeries(tendenciaRes.gestiones_por_dia, diasTendencia),
-      ganadas: buildContinuousSeries(tendenciaRes.ganadas_por_dia, diasTendencia),
-    }
     efectividad.value = efectividadRes
   } finally {
     loading.value = false
@@ -253,7 +271,9 @@ watch(activeTab, (tab) => {
   if (!allowed.includes('distrito')) filtros.value.distrito = null
 })
 
-watch([activeTab, filtros, rangoPreset], loadDashboard, { deep: true })
+watch([activeTab, filtros], loadDashboard, { deep: true })
+// Cambiar el rango solo recarga la tendencia, no todo el dashboard.
+watch(rangoTendencia, loadTendencia)
 
 onMounted(async () => {
   activeTab.value = visibleTabs.value[0] ?? 'general'
@@ -265,7 +285,7 @@ onMounted(async () => {
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">
+      <h1 class="text-xl font-semibold text-slate-700 dark:text-slate-200">
         {{ esEjecutivo ? 'Mi dashboard' : 'Dashboard' }}
       </h1>
       <p class="text-sm text-slate-500 dark:text-slate-400">
@@ -286,10 +306,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div class="card flex flex-wrap items-center gap-3 p-3">
-      <select v-model="rangoPreset" class="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900">
-        <option v-for="opt in RANGO_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
+    <div v-if="filtrosVisibles.length" class="card flex flex-wrap items-center gap-3 p-3">
       <select v-if="filtrosVisibles.includes('campaign')" v-model="filtros.campaign" class="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900">
         <option :value="null">Todas las campañas</option>
         <option v-for="c in campanas_ref" :key="c.id" :value="c.id">{{ c.nombre }}</option>
@@ -354,8 +371,14 @@ onMounted(async () => {
     </div>
 
     <section class="card p-4" :class="{ 'opacity-60': loading }">
-      <h2 class="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Tendencia — gestiones y oportunidades ganadas</h2>
-      <TrendChart :series="trendSeries" />
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-300">Tendencia — gestiones y oportunidades ganadas</h2>
+        <select v-model="rangoTendencia" class="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900">
+          <option v-for="opt in RANGO_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
+      <TrendChart v-if="trendSeries.some((s) => s.points.length)" :series="trendSeries" />
+      <p v-else class="py-8 text-center text-sm text-slate-400">Sin gestiones ni oportunidades ganadas en este rango.</p>
     </section>
 
     <section class="card p-4" :class="{ 'opacity-60': loading }">

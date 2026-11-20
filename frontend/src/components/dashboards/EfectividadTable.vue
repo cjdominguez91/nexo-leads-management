@@ -50,7 +50,7 @@ function fmtPct(value: number) {
         <tr
           v-for="row in ordenadas"
           :key="row.id"
-          class="text-slate-800 dark:text-slate-200"
+          class="text-slate-600 dark:text-slate-200"
           :class="clickable ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900' : ''"
           @click="clickable && emit('row-click', row)"
         >

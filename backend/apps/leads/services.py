@@ -8,7 +8,7 @@ from datetime import datetime
 from django.utils import timezone
 from django.db import transaction
 
-from apps.accounts.constants import GLOBAL_SCOPE_ROLES, RoleNames
+from apps.accounts.constants import DIVISION_SCOPE_ROLES, RoleNames
 from apps.accounts.models import User
 from apps.campaigns.models import CampaignFieldOrigen, CampaignModoCarga
 from apps.campaigns.services import resolver_campos_especiales
@@ -16,6 +16,8 @@ from apps.campaigns.validators import AtributosValidationError, validate_atribut
 from apps.core.scoping import (
     agencias_visibles_para,
     campanas_visibles_para,
+    es_global,
+    filtrar_por_division,
     territorios_visibles_para,
     usuarios_visibles_para,
 )
@@ -55,8 +57,12 @@ def leads_visibles_para(user):
     es visible si su Lead lo es)."""
 
     qs = Lead.objects.all()
-    if user.is_superuser or _role(user) in GLOBAL_SCOPE_ROLES:
+    if es_global(user):
         return qs
+    if _role(user) in DIVISION_SCOPE_ROLES:
+        # Todo el territorio, pero solo de su división (vía la campaña, que
+        # es la dueña de la división del lead).
+        return filtrar_por_division(qs, user, "campaign__division")
     campanas = campanas_visibles_para(user)
     if _role(user) == RoleNames.EJECUTIVO:
         return qs.filter(usuario_asignado=user, campaign__in=campanas)
@@ -75,6 +81,11 @@ def reasignar_lead(*, lead: Lead, usuario_destino: User, asignado_por: User, not
         raise AssignmentError("El usuario destino está fuera de tu alcance.")
 
     agencia_destino = usuario_destino.agencia_principal or lead.agencia
+
+    # Un lead nunca sale de la división de su campaña, ni siquiera por un
+    # ADMIN global: la agencia destino debe ser de esa misma división.
+    if agencia_destino.territorio.division_id != lead.campaign.division_id:
+        raise AssignmentError("El usuario destino pertenece a una agencia de otra división.")
 
     if _cambia_agencia(lead, agencia_destino) and not asignado_por.is_superuser and _role(asignado_por) == RoleNames.SUPERVISOR:
         territorios_ids = set(territorios_visibles_para(asignado_por).values_list("id", flat=True))
@@ -237,6 +248,9 @@ def crear_prospecto(*, campaign, usuario: User, atributos_raw: dict, agencia=Non
         if not (usuario.is_superuser or agencia.id in agencias_visibles_para(usuario).values_list("id", flat=True)):
             raise ProspectoError("Esa agencia está fuera de tu alcance.")
         agencia_resuelta = agencia
+
+    if agencia_resuelta.territorio.division_id != campaign.division_id:
+        raise ProspectoError("La agencia no pertenece a la división de esta campaña.")
 
     cliente_nombre = str(atributos_raw.get(nombre_field.field_key) or "").strip()
     telefono = str(atributos_raw.get(telefono_field.field_key) or "").strip()

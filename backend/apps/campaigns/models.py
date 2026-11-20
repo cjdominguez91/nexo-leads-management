@@ -23,9 +23,13 @@ class CampaignModoCarga(models.TextChoices):
 
 class CampaignType(TimeStampedModel):
     """"Contenedor"/plantilla de campaña (ej. "Créditos Personales"). Define,
-    vía CampaignFieldDefinition, el esquema dinámico de sus campañas."""
+    vía CampaignFieldDefinition, el esquema dinámico de sus campañas.
 
-    nombre = models.CharField(max_length=150, unique=True)
+    Pertenece a una División: cada división define sus propios productos, y
+    una Campaign solo puede usar un tipo de su misma división."""
+
+    nombre = models.CharField(max_length=150)
+    division = models.ForeignKey("accounts.Division", on_delete=models.PROTECT, related_name="campaign_types")
     categoria = models.CharField(max_length=20, choices=CampaignCategoria.choices)
     modo_carga = models.CharField(
         max_length=20, choices=CampaignModoCarga.choices, default=CampaignModoCarga.MASIVA
@@ -33,6 +37,11 @@ class CampaignType(TimeStampedModel):
 
     class Meta:
         ordering = ["nombre"]
+        constraints = [
+            # Único por división (antes era único global): dos divisiones pueden
+            # tener cada una su propio "Créditos Personales".
+            models.UniqueConstraint(fields=["division", "nombre"], name="unique_campaigntype_division_nombre")
+        ]
         verbose_name = "Tipo de campaña"
         verbose_name_plural = "Tipos de campaña"
 

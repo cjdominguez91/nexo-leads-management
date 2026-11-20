@@ -222,7 +222,7 @@ const table = useVueTable({
         <tr
           v-for="row in table.getRowModel().rows"
           :key="row.id"
-          class="cursor-pointer text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
+          class="cursor-pointer text-slate-600 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
           @click="emit('row-click', row.original)"
         >
           <td v-if="selectable" class="border-b border-slate-100 py-2 pr-2 dark:border-slate-900" @click.stop>

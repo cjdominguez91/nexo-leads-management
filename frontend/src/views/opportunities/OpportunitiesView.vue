@@ -162,13 +162,14 @@ onUnmounted(() => {
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Oportunidades</h1>
+      <h1 class="text-xl font-semibold text-slate-700 dark:text-slate-200">Oportunidades</h1>
       <p class="text-sm text-slate-500 dark:text-slate-400">
         Nacen de tipificar un lead. Cada fila te lleva al detalle del lead — ahí está todo.
       </p>
     </div>
 
-    <table class="card w-full p-4 text-left text-sm">
+    <div class="card overflow-x-auto">
+    <table class="data-table">
       <thead class="text-slate-500 dark:text-slate-400">
         <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
           <th
@@ -209,7 +210,7 @@ onUnmounted(() => {
         <tr
           v-for="opp in opportunities"
           :key="opp.id"
-          class="cursor-pointer text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
+          class="cursor-pointer text-slate-600 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
           @click="goToLead(opp)"
         >
           <td class="border-b border-slate-100 py-2 font-medium dark:border-slate-900">{{ opp.documento_identidad }}</td>
@@ -235,6 +236,7 @@ onUnmounted(() => {
         </tr>
       </tbody>
     </table>
+    </div>
     <TablePagination :page="page" :page-size="pageSize" :count="count" @update:page="handlePage" />
     <p v-if="loading" class="text-sm text-slate-400">Cargando…</p>
   </div>

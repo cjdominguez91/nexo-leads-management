@@ -1,43 +1,85 @@
-"""Cálculo de alcance territorial por usuario.
+"""Cálculo de alcance por usuario.
 
-Punto único de verdad para "qué agencias/distritos/usuarios puede ver u
-operar cada rol". Cualquier endpoint que filtre por agencia o distrito debe
-apoyarse en estas funciones en vez de reimplementar la regla — así, cuando
-cambie el modelo de alcance (como el paso de Jefe 1-agencia a Jefe N-agencias
-en esta migración), solo hay un lugar que tocar.
+Punto único de verdad para "qué divisiones/agencias/distritos/usuarios/
+campañas puede ver u operar cada rol". Cualquier endpoint que filtre por
+división, agencia o distrito debe apoyarse en estas funciones en vez de
+reimplementar la regla — así, cuando cambie el modelo de alcance, solo hay
+un lugar que tocar.
 
-Checklist de consumidores esperados a medida que se agreguen fases:
-- [Fase 1] apps.accounts: listado de usuarios visibles para un JEFE/SUPERVISOR.
-- [Fase 2] apps.leads: queryset de Lead, reglas de asignación, endpoint de reasignación.
-- [Fase 5] apps.dashboards: agregaciones filtradas por scope.
+El alcance tiene dos ejes, que se combinan con AND:
+
+1. División. Solo ADMIN (y superusuario) ve todas. Cualquier otro rol queda
+   confinado a `user.division`; si no tiene división, no ve nada (falla
+   cerrado, nunca abierto).
+2. Territorio, dentro de esa división:
+   - ADMIN_DIVISION / GERENTE: todo el territorio de su división.
+   - SUPERVISOR: sus distritos (UserTerritorio).
+   - JEFE / SUBJEFE: sus agencias (UserAgencia).
+   - EJECUTIVO: su agencia_principal.
+
+Consumidores (checklist para verificar que ningún endpoint quede sin el
+filtro de división):
+- apps.accounts: UserViewSet, DivisionViewSet, asignación de agencias/distritos.
+- apps.geo: TerritorioViewSet, AgenciaViewSet.
+- apps.campaigns: CampaignType/FieldDefinition/Section/Campaign/LoteCarga.
+- apps.leads: Category/SubCategory, leads_visibles_para, reasignación,
+  tipificación, prospectos, carga masiva (tasks._parse_row).
+- apps.opportunities y apps.dashboards: vía leads_visibles_para.
+- apps.audit: AuditLogViewSet.
 """
 
 from django.db.models import Q
 
-from apps.accounts.constants import RoleNames
+from apps.accounts.constants import DIVISION_SCOPE_ROLES, RoleNames
+
+
+# ── Eje 1: división ──────────────────────────────────────────────────────
+
+
+def es_global(user) -> bool:
+    """¿Cruza divisiones? Solo superusuario y ADMIN."""
+    return bool(user.is_superuser or _role(user) == RoleNames.ADMIN)
+
+
+def filtrar_por_division(qs, user, campo: str = "division"):
+    """Restringe `qs` a la división del usuario usando el lookup `campo`
+    (ej. "division", "territorio__division", "category__division").
+    Usuarios globales ven todo; un usuario no global sin división no ve nada."""
+    if es_global(user):
+        return qs
+    if not user.division_id:
+        return qs.none()
+    return qs.filter(**{f"{campo}_id": user.division_id})
+
+
+def misma_division(user, division_id) -> bool:
+    """¿Puede `user` operar sobre algo de `division_id`?"""
+    return es_global(user) or (user.division_id is not None and user.division_id == division_id)
+
+
+# ── Eje 2: territorio (siempre dentro del eje 1) ─────────────────────────
 
 
 def agencias_visibles_para(user):
     from apps.geo.models import Agencia
 
-    if user.is_superuser or _role(user) in (RoleNames.ADMIN, RoleNames.GERENTE):
-        return Agencia.objects.filter(activo=True)
+    base = filtrar_por_division(Agencia.objects.filter(activo=True), user, "territorio__division")
+    rol = _role(user)
 
-    if _role(user) == RoleNames.SUPERVISOR:
-        return Agencia.objects.filter(
-            territorio__in=territorios_visibles_para(user),
-            activo=True,
-        ).distinct()
+    if es_global(user) or rol in DIVISION_SCOPE_ROLES:
+        return base
 
-    if _role(user) in (RoleNames.JEFE, RoleNames.SUBJEFE):
-        return Agencia.objects.filter(
+    if rol == RoleNames.SUPERVISOR:
+        return base.filter(territorio__in=territorios_visibles_para(user)).distinct()
+
+    if rol in (RoleNames.JEFE, RoleNames.SUBJEFE):
+        return base.filter(
             asignaciones_usuario__usuario=user,
             asignaciones_usuario__activo=True,
-            activo=True,
         ).distinct()
 
-    if _role(user) == RoleNames.EJECUTIVO:
-        return Agencia.objects.filter(pk=user.agencia_principal_id, activo=True)
+    if rol == RoleNames.EJECUTIVO:
+        return base.filter(pk=user.agencia_principal_id)
 
     return Agencia.objects.none()
 
@@ -45,36 +87,40 @@ def agencias_visibles_para(user):
 def territorios_visibles_para(user):
     from apps.geo.models import Territorio
 
-    if user.is_superuser or _role(user) in (RoleNames.ADMIN, RoleNames.GERENTE):
-        return Territorio.objects.filter(activo=True)
+    base = filtrar_por_division(Territorio.objects.filter(activo=True), user)
+    rol = _role(user)
 
-    if _role(user) == RoleNames.SUPERVISOR:
-        return Territorio.objects.filter(
+    if es_global(user) or rol in DIVISION_SCOPE_ROLES:
+        return base
+
+    if rol == RoleNames.SUPERVISOR:
+        return base.filter(
             asignaciones_usuario__usuario=user,
             asignaciones_usuario__activo=True,
-            activo=True,
         ).distinct()
 
-    if _role(user) in (RoleNames.JEFE, RoleNames.SUBJEFE):
-        return Territorio.objects.filter(
-            agencias__in=agencias_visibles_para(user),
-            activo=True,
-        ).distinct()
+    if rol in (RoleNames.JEFE, RoleNames.SUBJEFE):
+        return base.filter(agencias__in=agencias_visibles_para(user)).distinct()
 
-    if _role(user) == RoleNames.EJECUTIVO and user.agencia_principal_id:
-        return Territorio.objects.filter(pk=user.agencia_principal.territorio_id)
+    if rol == RoleNames.EJECUTIVO and user.agencia_principal_id:
+        return base.filter(pk=user.agencia_principal.territorio_id)
 
     return Territorio.objects.none()
 
 
 def usuarios_visibles_para(user):
-    """Usuarios que `user` puede listar/gestionar según su rol y scope."""
+    """Usuarios que `user` puede listar/asignar según su rol y alcance."""
     from apps.accounts.models import User
 
-    if user.is_superuser or _role(user) in (RoleNames.ADMIN, RoleNames.GERENTE):
+    rol = _role(user)
+
+    if es_global(user):
         return User.objects.all()
 
-    if _role(user) in (RoleNames.SUPERVISOR, RoleNames.JEFE, RoleNames.SUBJEFE):
+    if rol in DIVISION_SCOPE_ROLES:
+        return filtrar_por_division(User.objects.all(), user)
+
+    if rol in (RoleNames.SUPERVISOR, RoleNames.JEFE, RoleNames.SUBJEFE):
         # Incluye al propio usuario: un JEFE/SUPERVISOR no tiene agencia_principal
         # (eso es solo de EJECUTIVO), pero también puede ser responsable directo
         # de un lead/oportunidad (gestiona dentro de su scope), así que debe
@@ -88,17 +134,16 @@ def usuarios_visibles_para(user):
 
 
 def campanas_visibles_para(user):
-    """Campañas que `user` puede ver/gestionar: división del usuario ==
-    división de la campaña (regla original), combinado con la restricción
-    opcional por agencia/distrito de la campaña (nueva) — si la campaña no
-    define `agencias_habilitadas`/`distritos_habilitados`, queda abierta a
-    todo el scope normal del rol; si los define, hay que estar dentro."""
+    """Campañas que `user` puede ver/gestionar: de su división (eje 1),
+    combinado con la restricción opcional por agencia/distrito de la campaña
+    — si la campaña no define `agencias_habilitadas`/`distritos_habilitados`,
+    queda abierta a todo el alcance territorial del rol; si los define, hay
+    que estar dentro."""
     from apps.campaigns.models import Campaign
 
-    if user.is_superuser or _role(user) in (RoleNames.ADMIN, RoleNames.GERENTE):
-        return Campaign.objects.all()
-
-    qs = Campaign.objects.filter(division_id=user.division_id)
+    qs = filtrar_por_division(Campaign.objects.all(), user)
+    if es_global(user) or _role(user) in DIVISION_SCOPE_ROLES:
+        return qs
 
     agencias = agencias_visibles_para(user)
     territorios = territorios_visibles_para(user)

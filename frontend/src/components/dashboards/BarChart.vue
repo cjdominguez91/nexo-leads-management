@@ -74,7 +74,7 @@ function onLeave() {
         class="card pointer-events-none fixed z-50 px-2 py-1 text-xs shadow-lg"
         :style="{ left: `${tooltip.x + 12}px`, top: `${tooltip.y + 12}px` }"
       >
-        <span class="font-medium text-slate-800 dark:text-slate-100">{{ tooltip.value }}</span>
+        <span class="font-medium text-slate-600 dark:text-slate-200">{{ tooltip.value }}</span>
         <span class="ml-1 text-slate-500 dark:text-slate-400">{{ tooltip.label }}</span>
       </div>
     </Teleport>

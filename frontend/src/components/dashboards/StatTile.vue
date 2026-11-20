@@ -18,7 +18,7 @@ function deltaLabel(delta: number) {
     <p class="text-xs text-slate-500 dark:text-slate-400">{{ label }}</p>
     <p
       class="mt-1 text-2xl font-semibold"
-      :class="alert ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100'"
+      :class="alert ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200'"
     >
       {{ value }}
     </p>

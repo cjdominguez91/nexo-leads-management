@@ -30,6 +30,14 @@
   --color-accent-800: #045a4e;
   --color-accent-900: #02362f;
 
+  /* "primary" = azul suave para botones de acción. 600 es el tono base:
+     contraste 4.6:1 con texto blanco (cumple WCAG AA en texto chico). */
+  --color-primary-50: #eef4fc;
+  --color-primary-100: #d9e6f8;
+  --color-primary-500: #5a8fe0;
+  --color-primary-600: #3a73d4;
+  --color-primary-700: #2f61b8;
+
   /* Superficies del layout — mismo nombre de token en claro/oscuro, el
      valor cambia bajo .dark más abajo. "sidebar" no cambia entre modos
      (mismo #333547 en ambos), así que solo se define acá. */
@@ -63,14 +71,17 @@ body,
   height: 100%;
 }
 
+/* Texto base gris oscuro, no negro puro: menos contraste duro, más
+   legible en pantallas grandes. Los títulos usan slate-700 y los valores
+   de tabla slate-600 (ver utilidades en cada vista). */
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color: #0f172a;
+  color: var(--color-slate-700);
 }
 
 .dark body {
-  color: #f1f5f9;
+  color: var(--color-slate-200);
 }
 
 /* Refuerzo explícito además del fix de color-scheme: algunos navegadores
@@ -78,13 +89,13 @@ body {
 input,
 select,
 textarea {
-  color: #0f172a;
+  color: var(--color-slate-700);
 }
 
 .dark input,
 .dark select,
 .dark textarea {
-  color: #f1f5f9;
+  color: var(--color-slate-200);
 }
 
 /* Contenedor "card" estándar — fondo blanco/#2A3042 sobre el fondo gris de
@@ -101,5 +112,32 @@ textarea {
 
   .dark .card {
     border-color: var(--color-slate-800);
+  }
+
+  /* Tabla de datos dentro de un .card. Uso:
+       <div class="card overflow-x-auto"><table class="data-table">…</table></div>
+     El padding va en las celdas (no en <table>: con border-collapse el
+     padding de la tabla se ignora, por eso el texto quedaba pegado al borde). */
+  .data-table {
+    width: 100%;
+    text-align: left;
+    font-size: var(--text-sm);
+  }
+
+  .data-table th,
+  .data-table td {
+    padding-inline: 1rem;
+  }
+
+  .data-table thead {
+    background-color: var(--color-slate-50);
+  }
+
+  .data-table thead tr:first-child th {
+    padding-top: 0.75rem;
+  }
+
+  .dark .data-table thead {
+    background-color: color-mix(in oklab, var(--color-slate-900) 40%, transparent);
   }
 }

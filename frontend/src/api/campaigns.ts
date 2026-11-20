@@ -34,6 +34,8 @@ export interface CampaignFieldDefinition {
 export interface CampaignType {
   id: number
   nombre: string
+  division: number
+  division_nombre: string
   categoria: 'VENTAS' | 'COBROS'
   modo_carga: CampaignModoCarga
   secciones: CampaignSection[]
@@ -81,8 +83,10 @@ export function fetchCampaignType(id: number) {
   return apiClient.get<CampaignType>(`/campaigns/campaign-types/${id}/`).then((res) => res.data)
 }
 
+/** `division` solo la usa ADMIN global; para ADMIN_DIVISION el backend fija la suya. */
 export function createCampaignType(payload: {
   nombre: string
+  division?: number | null
   categoria: 'VENTAS' | 'COBROS'
   modo_carga?: CampaignModoCarga
 }) {
